@@ -5,7 +5,7 @@ spring:
   application:
     name: api-gateway
   config:
-    import: configserver:
+    import: "optional:configserver:"
   cloud:
     config:
       discovery:
@@ -18,15 +18,15 @@ spring:
           predicates: Path=/eureka/web**
           filters: SetPath=/eureka/web
         - id: incident-service
-          uri: http://localhost:8082
+          uri: lb://incident-service
           predicates: Path=/api/incidents/**
           filters: StripPrefix=2
         - id: notification-service
-          uri: http://localhost:8083
+          uri: lb://notification-service
           predicates: Path=/api/notifications/**
           filters: StripPrefix=2
         - id: user-service
-          uri: http://localhost:8084
+          uri: lb://user-service
           predicates: Path=/api/users/**
           filters: StripPrefix=2
   security:
@@ -36,6 +36,45 @@ spring:
           issuer-uri: http://localhost:8081/realms/ims
 
 eureka:
+  instance:
+    hostname: localhost
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,tracing
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+    instances:
+      api-gateway:
+        baseConfig: default
+
+spring:
+  cloud:
+    loadbalancer:
+      ribbon:
+        enabled: false

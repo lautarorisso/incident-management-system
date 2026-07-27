@@ -5,7 +5,7 @@ spring:
   application:
     name: incident-service
   config:
-    import: optional:configserver:
+    import: "optional:configserver:"
   cloud:
     config:
       discovery:
@@ -26,6 +26,45 @@ spring:
     password: ${RABBITMQ_PASS:guest}
 
 eureka:
+  instance:
+    hostname: localhost
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,tracing
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+    instances:
+      incident-service:
+        baseConfig: default
+
+spring:
+  cloud:
+    loadbalancer:
+      ribbon:
+        enabled: false
