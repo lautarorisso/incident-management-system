@@ -11,6 +11,9 @@ spring:
       discovery:
         enabled: true
         service-id: config-server
+    loadbalancer:
+      ribbon:
+        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/incident_db
     username: ${POSTGRES_USER:postgres}
@@ -62,9 +65,3 @@ resilience4j:
     instances:
       incident-service:
         baseConfig: default
-
-spring:
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
