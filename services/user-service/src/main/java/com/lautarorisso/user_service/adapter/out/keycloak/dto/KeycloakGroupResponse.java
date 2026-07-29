@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 /**
  * DTO representing a Keycloak group from the Admin REST API.
  */
@@ -18,5 +16,4 @@ public class KeycloakGroupResponse {
     private String id;
     private String name;
     private String path;
-    private Map<String, String[]> attributes;
 }

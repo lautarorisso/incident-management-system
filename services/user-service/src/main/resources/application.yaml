@@ -11,6 +11,9 @@ spring:
       discovery:
         enabled: true
         service-id: config-server
+    loadbalancer:
+      ribbon:
+        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/user_db
     username: ${POSTGRES_USER:postgres}
@@ -58,8 +61,9 @@ resilience4j:
       user-service:
         baseConfig: default
 
-spring:
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
+keycloak:
+  admin:
+    server-url: http://localhost:8081
+    realm: master
+    client-id: admin-cli
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:changeme}
