@@ -63,8 +63,10 @@ resilience4j:
       notification-service:
         baseConfig: default
 
-spring:
   cloud:
     loadbalancer:
       ribbon:
         enabled: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
