@@ -14,11 +14,13 @@ spring:
       enabled: false
     discovery:
       enabled: false
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+      - org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration
+      - org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration
+      - org.springframework.cloud.config.client.ConfigClientAutoConfiguration
+      - org.springframework.cloud.openfeign.FeignAutoConfiguration
 eureka:
   client:
     enabled: false
