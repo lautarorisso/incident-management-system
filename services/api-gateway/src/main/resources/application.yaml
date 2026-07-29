@@ -29,6 +29,9 @@ spring:
           uri: lb://user-service
           predicates: Path=/api/users/**
           filters: StripPrefix=2
+    loadbalancer:
+      ribbon:
+        enabled: false
   security:
     oauth2:
       resourceserver:
@@ -72,9 +75,3 @@ resilience4j:
     instances:
       api-gateway:
         baseConfig: default
-
-spring:
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
