@@ -16,11 +16,24 @@ spring:
       enabled: false
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
       - org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration
       - org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration
       - org.springframework.cloud.config.client.ConfigClientAutoConfiguration
-      - org.springframework.cloud.openfeign.FeignAutoConfiguration
+  rabbitmq:
+    host: localhost
+    port: 5672
 eureka:
   client:
     enabled: false
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
