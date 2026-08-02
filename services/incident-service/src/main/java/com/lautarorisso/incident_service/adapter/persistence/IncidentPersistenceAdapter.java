@@ -42,14 +42,13 @@ public class IncidentPersistenceAdapter implements IncidentRepository, IncidentE
         var saved = incidentRepo.save(entity);
 
         // Create outbox event for the domain event
-        var outboxEvent = OutboxEventEntity.builder()
-                .id(UUID.randomUUID())
-                .aggregateId(incident.getId().getValue())
-                .eventType(IncidentEvent.INCIDENT_CREATED.name())
-                .payload("{\"incidentId\":\"" + incident.getId().getValue() + "\"}")
-                .published(false)
-                .createdAt(Instant.now())
-                .build();
+        var outboxEvent = new OutboxEventEntity();
+        outboxEvent.setId(UUID.randomUUID());
+        outboxEvent.setAggregateId(incident.getId().getValue());
+        outboxEvent.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        outboxEvent.setPayload("{\"incidentId\":\"" + incident.getId().getValue() + "\"}");
+        outboxEvent.setPublished(false);
+        outboxEvent.setCreatedAt(Instant.now());
         outboxRepo.save(outboxEvent);
 
         return mapper.toDomain(saved);
@@ -81,14 +80,13 @@ public class IncidentPersistenceAdapter implements IncidentRepository, IncidentE
     @Override
     @Transactional
     public void publish(IncidentEvent eventType, IncidentId incidentId) {
-        var outboxEvent = OutboxEventEntity.builder()
-                .id(UUID.randomUUID())
-                .aggregateId(incidentId.getValue())
-                .eventType(eventType.name())
-                .payload("{\"incidentId\":\"" + incidentId.getValue() + "\"}")
-                .published(false)
-                .createdAt(Instant.now())
-                .build();
+        var outboxEvent = new OutboxEventEntity();
+        outboxEvent.setId(UUID.randomUUID());
+        outboxEvent.setAggregateId(incidentId.getValue());
+        outboxEvent.setEventType(eventType.name());
+        outboxEvent.setPayload("{\"incidentId\":\"" + incidentId.getValue() + "\"}");
+        outboxEvent.setPublished(false);
+        outboxEvent.setCreatedAt(Instant.now());
         outboxRepo.save(outboxEvent);
     }
 }

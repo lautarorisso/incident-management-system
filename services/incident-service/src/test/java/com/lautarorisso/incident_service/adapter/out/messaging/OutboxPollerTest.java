@@ -48,14 +48,13 @@ class OutboxPollerTest {
     @Test
     void shouldPublishUnpublishedEventsAndMarkThemPublished() {
         UUID incidentId = UUID.randomUUID();
-        OutboxEventEntity event = OutboxEventEntity.builder()
-                .id(UUID.randomUUID())
-                .aggregateId(incidentId)
-                .eventType(IncidentEvent.INCIDENT_CREATED.name())
-                .payload("{\"incidentId\":\"" + incidentId + "\"}")
-                .published(false)
-                .createdAt(Instant.now())
-                .build();
+        OutboxEventEntity event = new OutboxEventEntity();
+        event.setId(UUID.randomUUID());
+        event.setAggregateId(incidentId);
+        event.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        event.setPayload("{\"incidentId\":\"" + incidentId + "\"}");
+        event.setPublished(false);
+        event.setCreatedAt(Instant.now());
         when(outboxRepo.findByPublishedFalse()).thenReturn(List.of(event));
 
         poller.processOutbox();
@@ -69,14 +68,20 @@ class OutboxPollerTest {
     void shouldPublishMultipleEventsInOneBatch() {
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
-        OutboxEventEntity event1 = OutboxEventEntity.builder()
-                .id(UUID.randomUUID()).aggregateId(id1)
-                .eventType(IncidentEvent.INCIDENT_CREATED.name()).payload("{}")
-                .published(false).createdAt(Instant.now()).build();
-        OutboxEventEntity event2 = OutboxEventEntity.builder()
-                .id(UUID.randomUUID()).aggregateId(id2)
-                .eventType(IncidentEvent.INCIDENT_ASSIGNED.name()).payload("{}")
-                .published(false).createdAt(Instant.now()).build();
+        OutboxEventEntity event1 = new OutboxEventEntity();
+        event1.setId(UUID.randomUUID());
+        event1.setAggregateId(id1);
+        event1.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        event1.setPayload("{}");
+        event1.setPublished(false);
+        event1.setCreatedAt(Instant.now());
+        OutboxEventEntity event2 = new OutboxEventEntity();
+        event2.setId(UUID.randomUUID());
+        event2.setAggregateId(id2);
+        event2.setEventType(IncidentEvent.INCIDENT_ASSIGNED.name());
+        event2.setPayload("{}");
+        event2.setPublished(false);
+        event2.setCreatedAt(Instant.now());
         when(outboxRepo.findByPublishedFalse()).thenReturn(List.of(event1, event2));
 
         poller.processOutbox();
@@ -98,10 +103,13 @@ class OutboxPollerTest {
     @Test
     void shouldHandleDifferentEventTypes() {
         UUID incidentId = UUID.randomUUID();
-        OutboxEventEntity event = OutboxEventEntity.builder()
-                .id(UUID.randomUUID()).aggregateId(incidentId)
-                .eventType(IncidentEvent.INCIDENT_STATUS_CHANGED.name()).payload("{}")
-                .published(false).createdAt(Instant.now()).build();
+        OutboxEventEntity event = new OutboxEventEntity();
+        event.setId(UUID.randomUUID());
+        event.setAggregateId(incidentId);
+        event.setEventType(IncidentEvent.INCIDENT_STATUS_CHANGED.name());
+        event.setPayload("{}");
+        event.setPublished(false);
+        event.setCreatedAt(Instant.now());
         when(outboxRepo.findByPublishedFalse()).thenReturn(List.of(event));
 
         poller.processOutbox();

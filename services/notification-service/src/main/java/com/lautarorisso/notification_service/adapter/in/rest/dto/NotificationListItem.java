@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,10 +14,10 @@ import java.util.UUID;
  * Lightweight REST response DTO for notification list items.
  */
 @Getter
-@Setter
+@ToString
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Schema(description = "Notification list item")
 public class NotificationListItem {
 

@@ -194,15 +194,14 @@ class IncidentPersistenceAdapterTest {
     // --- Helpers ---
 
     private void persistTestIncident(IncidentId id, String title, IncidentStatus status) {
-        var entity = com.lautarorisso.incident_service.adapter.persistence.entity.IncidentEntity.builder()
-                .id(id.getValue())
-                .title(title)
-                .description("Description for " + title)
-                .status(status.name())
-                .priority(IncidentPriority.MEDIUM.name())
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+        var entity = new com.lautarorisso.incident_service.adapter.persistence.entity.IncidentEntity();
+        entity.setId(id.getValue());
+        entity.setTitle(title);
+        entity.setDescription("Description for " + title);
+        entity.setStatus(status.name());
+        entity.setPriority(IncidentPriority.MEDIUM.name());
+        entity.setCreatedAt(Instant.now());
+        entity.setUpdatedAt(Instant.now());
         incidentRepo.save(entity);
     }
 }

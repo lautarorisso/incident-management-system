@@ -60,17 +60,16 @@ class IncidentEntityMapperTest {
         UUID teamId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        IncidentEntity entity = IncidentEntity.builder()
-                .id(id)
-                .title("Entity to domain")
-                .description("Testing mapping from JPA entity to domain")
-                .status("RESOLVED")
-                .priority("CRITICAL")
-                .assigneeId(assigneeId)
-                .teamId(teamId)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        IncidentEntity entity = new IncidentEntity();
+        entity.setId(id);
+        entity.setTitle("Entity to domain");
+        entity.setDescription("Testing mapping from JPA entity to domain");
+        entity.setStatus("RESOLVED");
+        entity.setPriority("CRITICAL");
+        entity.setAssigneeId(assigneeId);
+        entity.setTeamId(teamId);
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
 
         Incident domain = mapper.toDomain(entity);
 
@@ -110,12 +109,14 @@ class IncidentEntityMapperTest {
 
         for (IncidentStatus status : IncidentStatus.values()) {
             for (IncidentPriority priority : IncidentPriority.values()) {
-                IncidentEntity entity = IncidentEntity.builder()
-                        .id(id).title("Test").description("Test")
-                        .status(status.name())
-                        .priority(priority.name())
-                        .createdAt(now).updatedAt(now)
-                        .build();
+                IncidentEntity entity = new IncidentEntity();
+                entity.setId(id);
+                entity.setTitle("Test");
+                entity.setDescription("Test");
+                entity.setStatus(status.name());
+                entity.setPriority(priority.name());
+                entity.setCreatedAt(now);
+                entity.setUpdatedAt(now);
 
                 Incident domain = mapper.toDomain(entity);
 

@@ -38,17 +38,16 @@ class IncidentEntityMappingTest {
         UUID teamId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        IncidentEntity entity = IncidentEntity.builder()
-                .id(id)
-                .title("Test incident")
-                .description("Test description")
-                .status("OPEN")
-                .priority("MEDIUM")
-                .assigneeId(assigneeId)
-                .teamId(teamId)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        IncidentEntity entity = new IncidentEntity();
+        entity.setId(id);
+        entity.setTitle("Test incident");
+        entity.setDescription("Test description");
+        entity.setStatus("OPEN");
+        entity.setPriority("MEDIUM");
+        entity.setAssigneeId(assigneeId);
+        entity.setTeamId(teamId);
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
 
         IncidentEntity saved = incidentRepo.save(entity);
         Optional<IncidentEntity> found = incidentRepo.findById(id);
@@ -64,14 +63,22 @@ class IncidentEntityMappingTest {
 
     @Test
     void shouldFindAllIncidentEntities() {
-        IncidentEntity e1 = IncidentEntity.builder()
-                .id(UUID.randomUUID()).title("A").description("Desc A")
-                .status("OPEN").priority("LOW").createdAt(Instant.now()).updatedAt(Instant.now())
-                .build();
-        IncidentEntity e2 = IncidentEntity.builder()
-                .id(UUID.randomUUID()).title("B").description("Desc B")
-                .status("IN_PROGRESS").priority("HIGH").createdAt(Instant.now()).updatedAt(Instant.now())
-                .build();
+        IncidentEntity e1 = new IncidentEntity();
+        e1.setId(UUID.randomUUID());
+        e1.setTitle("A");
+        e1.setDescription("Desc A");
+        e1.setStatus("OPEN");
+        e1.setPriority("LOW");
+        e1.setCreatedAt(Instant.now());
+        e1.setUpdatedAt(Instant.now());
+        IncidentEntity e2 = new IncidentEntity();
+        e2.setId(UUID.randomUUID());
+        e2.setTitle("B");
+        e2.setDescription("Desc B");
+        e2.setStatus("IN_PROGRESS");
+        e2.setPriority("HIGH");
+        e2.setCreatedAt(Instant.now());
+        e2.setUpdatedAt(Instant.now());
 
         incidentRepo.save(e1);
         incidentRepo.save(e2);
@@ -83,10 +90,14 @@ class IncidentEntityMappingTest {
     @Test
     void shouldDeleteIncidentEntity() {
         UUID id = UUID.randomUUID();
-        IncidentEntity entity = IncidentEntity.builder()
-                .id(id).title("To delete").description("Will be removed")
-                .status("OPEN").priority("LOW").createdAt(Instant.now()).updatedAt(Instant.now())
-                .build();
+        IncidentEntity entity = new IncidentEntity();
+        entity.setId(id);
+        entity.setTitle("To delete");
+        entity.setDescription("Will be removed");
+        entity.setStatus("OPEN");
+        entity.setPriority("LOW");
+        entity.setCreatedAt(Instant.now());
+        entity.setUpdatedAt(Instant.now());
 
         incidentRepo.save(entity);
         assertTrue(incidentRepo.findById(id).isPresent());
@@ -102,17 +113,16 @@ class IncidentEntityMappingTest {
         UUID teamId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        IncidentEntity entity = IncidentEntity.builder()
-                .id(id)
-                .title("Full field test")
-                .description("Testing all columns are properly mapped")
-                .status("RESOLVED")
-                .priority("CRITICAL")
-                .assigneeId(assigneeId)
-                .teamId(teamId)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        IncidentEntity entity = new IncidentEntity();
+        entity.setId(id);
+        entity.setTitle("Full field test");
+        entity.setDescription("Testing all columns are properly mapped");
+        entity.setStatus("RESOLVED");
+        entity.setPriority("CRITICAL");
+        entity.setAssigneeId(assigneeId);
+        entity.setTeamId(teamId);
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
 
         IncidentEntity saved = incidentRepo.save(entity);
 
@@ -134,14 +144,13 @@ class IncidentEntityMappingTest {
         UUID incidentId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        OutboxEventEntity event = OutboxEventEntity.builder()
-                .id(id)
-                .aggregateId(incidentId)
-                .eventType("INCIDENT_CREATED")
-                .payload("{\"incidentId\":\"" + incidentId + "\"}")
-                .published(false)
-                .createdAt(now)
-                .build();
+        OutboxEventEntity event = new OutboxEventEntity();
+        event.setId(id);
+        event.setAggregateId(incidentId);
+        event.setEventType("INCIDENT_CREATED");
+        event.setPayload("{\"incidentId\":\"" + incidentId + "\"}");
+        event.setPublished(false);
+        event.setCreatedAt(now);
 
         OutboxEventEntity saved = outboxRepo.save(event);
         Optional<OutboxEventEntity> found = outboxRepo.findById(id);
@@ -155,14 +164,20 @@ class IncidentEntityMappingTest {
 
     @Test
     void shouldFindUnpublishedOutboxEvents() {
-        OutboxEventEntity e1 = OutboxEventEntity.builder()
-                .id(UUID.randomUUID()).aggregateId(UUID.randomUUID())
-                .eventType("INCIDENT_CREATED").payload("{}").published(false)
-                .createdAt(Instant.now()).build();
-        OutboxEventEntity e2 = OutboxEventEntity.builder()
-                .id(UUID.randomUUID()).aggregateId(UUID.randomUUID())
-                .eventType("INCIDENT_ASSIGNED").payload("{}").published(true)
-                .createdAt(Instant.now()).build();
+        OutboxEventEntity e1 = new OutboxEventEntity();
+        e1.setId(UUID.randomUUID());
+        e1.setAggregateId(UUID.randomUUID());
+        e1.setEventType("INCIDENT_CREATED");
+        e1.setPayload("{}");
+        e1.setPublished(false);
+        e1.setCreatedAt(Instant.now());
+        OutboxEventEntity e2 = new OutboxEventEntity();
+        e2.setId(UUID.randomUUID());
+        e2.setAggregateId(UUID.randomUUID());
+        e2.setEventType("INCIDENT_ASSIGNED");
+        e2.setPayload("{}");
+        e2.setPublished(true);
+        e2.setCreatedAt(Instant.now());
 
         outboxRepo.save(e1);
         outboxRepo.save(e2);
@@ -175,10 +190,13 @@ class IncidentEntityMappingTest {
     @Test
     void shouldMarkOutboxEventAsPublished() {
         UUID id = UUID.randomUUID();
-        OutboxEventEntity event = OutboxEventEntity.builder()
-                .id(id).aggregateId(UUID.randomUUID())
-                .eventType("INCIDENT_CREATED").payload("{}").published(false)
-                .createdAt(Instant.now()).build();
+        OutboxEventEntity event = new OutboxEventEntity();
+        event.setId(id);
+        event.setAggregateId(UUID.randomUUID());
+        event.setEventType("INCIDENT_CREATED");
+        event.setPayload("{}");
+        event.setPublished(false);
+        event.setCreatedAt(Instant.now());
 
         outboxRepo.save(event);
         OutboxEventEntity saved = outboxRepo.findById(id).orElseThrow();

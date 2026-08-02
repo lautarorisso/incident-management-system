@@ -1,13 +1,15 @@
 package com.lautarorisso.user_service.adapter.out.keycloak;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
  * Configuration properties for Keycloak Admin client connection.
  */
-@Data
+@Getter
+@ToString
 @Component
 @ConfigurationProperties(prefix = "keycloak.admin")
 public class KeycloakProperties {

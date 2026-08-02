@@ -3,8 +3,9 @@ package com.lautarorisso.user_service.adapter.in.rest.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,10 +13,11 @@ import java.util.UUID;
 /**
  * REST response DTO for a Team.
  */
-@Data
+@Getter
+@ToString
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Schema(description = "Team response")
 public class TeamResponse {
     private UUID id;
