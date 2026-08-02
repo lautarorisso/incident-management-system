@@ -12,38 +12,40 @@ spring:
         enabled: true
         service-id: config-server
     gateway:
-      routes:
-        - id: discovery-service
-          uri: http://localhost:8761
-          predicates: Path=/eureka/web**
-          filters: SetPath=/eureka/web
-        - id: incident-service
-          uri: lb://incident-service
-          predicates: Path=/api/incidents/**
-          filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
-              args:
-                name: incident-service
-                fallbackUri: forward:/fallback/incidents
-        - id: notification-service
-          uri: lb://notification-service
-          predicates: Path=/api/notifications/**
-          filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
-              args:
-                name: notification-service
-                fallbackUri: forward:/fallback/notifications
-        - id: user-service
-          uri: lb://user-service
-          predicates: Path=/api/users/**
-          filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
-              args:
-                name: user-service
-                fallbackUri: forward:/fallback/users
+      server:
+        webflux:
+          routes:
+            - id: discovery-service
+              uri: http://localhost:8761
+              predicates: Path=/eureka/web**
+              filters: SetPath=/eureka/web
+            - id: incident-service
+              uri: lb://incident-service
+              predicates: Path=/api/incidents/**
+              filters:
+                - StripPrefix=2
+                - name: CircuitBreaker
+                  args:
+                    name: incident-service
+                    fallbackUri: forward:/fallback/incidents
+            - id: notification-service
+              uri: lb://notification-service
+              predicates: Path=/api/notifications/**
+              filters:
+                - StripPrefix=2
+                - name: CircuitBreaker
+                  args:
+                    name: notification-service
+                    fallbackUri: forward:/fallback/notifications
+            - id: user-service
+              uri: lb://user-service
+              predicates: Path=/api/users/**
+              filters:
+                - StripPrefix=2
+                - name: CircuitBreaker
+                  args:
+                    name: user-service
+                    fallbackUri: forward:/fallback/users
     loadbalancer:
       ribbon:
         enabled: false
@@ -68,9 +70,9 @@ management:
   endpoint:
     health:
       show-details: always
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true
   tracing:
     sampling:

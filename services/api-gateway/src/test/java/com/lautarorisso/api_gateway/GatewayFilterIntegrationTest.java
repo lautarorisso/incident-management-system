@@ -22,10 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "eureka.client.enabled=false",
                 "spring.cloud.config.enabled=false",
-                "spring.cloud.gateway.routes[0].id=filter-test-route",
-                "spring.cloud.gateway.routes[0].uri=http://localhost:9199",
-                "spring.cloud.gateway.routes[0].predicates=Path=/filter-test/**",
-                "spring.cloud.gateway.routes[0].filters[0]=StripPrefix=1"
+                "spring.cloud.gateway.server.webflux.routes[0].id=filter-test-route",
+                "spring.cloud.gateway.server.webflux.routes[0].uri=http://localhost:9199",
+                "spring.cloud.gateway.server.webflux.routes[0].predicates=Path=/filter-test/**",
+                "spring.cloud.gateway.server.webflux.routes[0].filters[0]=StripPrefix=1"
         })
 @Import(TestSecurityConfig.class)
 class GatewayFilterIntegrationTest {
