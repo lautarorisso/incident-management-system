@@ -203,7 +203,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | Test command | `./mvnw test -pl services/incident-service` |
 | Start command | `./mvnw spring-boot:run -pl services/incident-service` |
 | Health endpoint | http://localhost:8082/actuator/health |
-| API docs | http://localhost:8082/swagger-ui.html |
+| API docs | http://localhost:8082/scalar |
 
 **Architecture**: Hexagonal (ports & adapters)
 - `domain/` — `Incident`, `IncidentId`, `IncidentStatus`, `IncidentPriority`, `IncidentDomainService`
@@ -257,7 +257,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | Test command | `./mvnw test -pl services/notification-service` |
 | Start command | `./mvnw spring-boot:run -pl services/notification-service` |
 | Health endpoint | http://localhost:8083/actuator/health |
-| API docs | http://localhost:8083/swagger-ui.html (via gateway: `/api/notifications/v3/api-docs`) |
+| API docs | http://localhost:8083/scalar |
 
 **Architecture**: Hexagonal (ports & adapters)
 - `domain/` — `Notification`, `NotificationId`, `NotificationType`, `NotificationStatus`, `ProcessedEvent`
@@ -302,7 +302,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | Test command | `./mvnw test -pl services/user-service` |
 | Start command | `./mvnw spring-boot:run -pl services/user-service` |
 | Health endpoint | http://localhost:8084/actuator/health |
-| API docs | http://localhost:8084/swagger-ui.html |
+| API docs | http://localhost:8084/scalar |
 
 **Architecture**: Hexagonal (ports & adapters)
 - `domain/` — `User`, `UserId`, `Team`, `TeamId`
@@ -345,10 +345,10 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | http://localhost:8761 | Eureka Dashboard |
 | http://localhost:8081 | Keycloak Admin Console |
 | http://localhost:15672 | RabbitMQ Management UI |
-| http://localhost:8082/swagger-ui.html | Incident Service API Docs |
-| http://localhost:8083/swagger-ui.html | Notification Service API Docs |
-| http://localhost:8084/swagger-ui.html | User Service API Docs |
-| http://localhost:8080/webjars/swagger-ui/index.html | Aggregated OpenAPI (via Gateway) |
+| http://localhost:8082/scalar | Incident Service API Docs |
+| http://localhost:8083/scalar | Notification Service API Docs |
+| http://localhost:8084/scalar | User Service API Docs |
+| http://localhost:8080/scalar | Aggregated OpenAPI (via Gateway) |
 
 ## Infrastructure
 

@@ -20,15 +20,30 @@ spring:
         - id: incident-service
           uri: lb://incident-service
           predicates: Path=/api/incidents/**
-          filters: StripPrefix=2
+          filters:
+            - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: incident-service
+                fallbackUri: forward:/fallback/incidents
         - id: notification-service
           uri: lb://notification-service
           predicates: Path=/api/notifications/**
-          filters: StripPrefix=2
+          filters:
+            - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: notification-service
+                fallbackUri: forward:/fallback/notifications
         - id: user-service
           uri: lb://user-service
           predicates: Path=/api/users/**
-          filters: StripPrefix=2
+          filters:
+            - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: user-service
+                fallbackUri: forward:/fallback/users
     loadbalancer:
       ribbon:
         enabled: false
@@ -61,6 +76,24 @@ management:
     sampling:
       probability: 1.0
 
+springdoc:
+  api-docs:
+    enabled: true
+
+scalar:
+  enabled: true
+  path: /scalar
+  sources:
+    - title: API Gateway
+      url: /v3/api-docs
+      default: true
+    - title: Incident Service
+      url: /api/incidents/v3/api-docs
+    - title: User Service
+      url: /api/users/v3/api-docs
+    - title: Notification Service
+      url: /api/notifications/v3/api-docs
+
 resilience4j:
   circuitbreaker:
     configs:
@@ -74,4 +107,10 @@ resilience4j:
         failureRateThreshold: 50
     instances:
       api-gateway:
+        baseConfig: default
+      incident-service:
+        baseConfig: default
+      notification-service:
+        baseConfig: default
+      user-service:
         baseConfig: default
