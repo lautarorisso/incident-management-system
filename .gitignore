@@ -35,3 +35,5 @@ Thumbs.db
 # JVM
 hs_err_pid*
 replay_pid*
+# Local AI runtime state
+.atl/

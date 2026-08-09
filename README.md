@@ -2,6 +2,8 @@
 
 Microservices-based incident management system built with Spring Boot 3.5, Spring Cloud 2025, and Java 21.
 
+> **Note**: This is a work-in-progress MVP for portfolio demonstration. Keycloak and RabbitMQ integrations are planned but not yet implemented. The system runs with a simplified local stack (PostgreSQL, Eureka, API Gateway + 3 domain services).
+
 ## Architecture
 
 ```
@@ -11,33 +13,38 @@ Microservices-based incident management system built with Spring Boot 3.5, Sprin
                     │   Cloud GW)  │
                     └──────┬───────┘
                            │
-          ┌────────────────┼────────────────┐
-          │                │                │
+           ┌────────────────┼────────────────┐
+           │                │                │
 ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼───────┐
 │ incident-      │ │ notification-│ │ user-service │
 │ service        │ │ service      │ │              │
-│ :8082          │ │ :8083        │ │ :8084        │
+│ :8081          │ │ :8083        │ │ :8082        │
 └───────┬────────┘ └──────┬───────┘ └──────┬───────┘
         │                 │                │
    ┌────▼────┐      ┌────▼────┐     ┌────▼────┐
    │PostgreSQL│     │PostgreSQL│    │PostgreSQL│
    │incident_db│   │notific._db│   │ user_db  │
-   └─────────┘     └────┬─────┘    └─────────┘
+   └─────────┘     └─────────┘    └─────────┘
                         │
                    ┌────▼────┐
                    │RabbitMQ │
                    └─────────┘
+
+┌─────────────────────────────────────────────┐
+│ discovery-service (Eureka) :8761            │
+│ PostgreSQL :5432  |  RabbitMQ :5672/15672   │
+└─────────────────────────────────────────────┘
 ```
 
 ## Services
 
 | Service | Port | Description |
 |---------|------|-------------|
-| api-gateway | 8080 | Routing, JWT validation, rate limiting |
+| api-gateway | 8080 | Routing, rate limiting, circuit breakers (JWT validation pending Keycloak) |
 | discovery-service | 8761 | Eureka Service Discovery Server |
-| incident-service | 8082 | Incident CRUD, state machine, events |
+| incident-service | 8081 | Incident CRUD, state machine, events, outbox pattern |
 | notification-service | 8083 | Async notification consumption and persistence |
-| user-service | 8084 | User profiles, teams, departments |
+| user-service | 8082 | User profiles, teams, departments (Keycloak sync pending) |
 
 ## Infrastructure
 
@@ -45,7 +52,7 @@ Microservices-based incident management system built with Spring Boot 3.5, Sprin
 |-----------|------|----|
 | PostgreSQL | 5432 | — |
 | RabbitMQ | 5672 | http://localhost:15672 |
-| Keycloak | 8081 | http://localhost:8081 |
+| Keycloak | *planned* | *not yet deployed* |
 
 ## Prerequisites
 
@@ -58,7 +65,7 @@ Microservices-based incident management system built with Spring Boot 3.5, Sprin
 ### 1. Start infrastructure
 
 ```bash
-docker-compose up -d postgres rabbitmq keycloak
+docker-compose up -d postgres rabbitmq
 ```
 
 ### 2. Build the project
@@ -90,7 +97,7 @@ Open separate terminals for each service. Start them in this order:
 docker-compose up -d --build
 ```
 
-This builds and starts all 8 containers (3 infra + 5 services).
+This builds and starts all 7 containers (2 infra + 5 services).
 
 ## Running Tests
 
@@ -164,8 +171,8 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 |-----------|-------|
 | Port | 8080 |
 | Package | `services/api-gateway` |
-| Role | Spring Cloud Gateway — routing, JWT validation, rate limiting, circuit breakers |
-| Dependencies | `discovery-service`, `keycloak` |
+| Role | Spring Cloud Gateway — routing, rate limiting, circuit breakers (JWT validation pending Keycloak) |
+| Dependencies | `discovery-service` |
 | Test command | `./mvnw test -pl services/api-gateway` |
 | Start command | `./mvnw spring-boot:run -pl services/api-gateway` |
 | Health endpoint | http://localhost:8080/actuator/health |
@@ -182,13 +189,16 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 - `CorrelationIdFilter` (order -100) — injects `X-Correlation-Id`
 - `RequestLoggingFilter` (order -90) — logs method/path/status/duration
 - `RateLimitFilter` (order -80) — token bucket per client IP
-- `UserIdHeaderFilter` (order -60) — JWT `sub` → `X-User-Id`
+- `UserIdHeaderFilter` (order -60) — JWT `sub` → `X-User-Id` (pending Keycloak)
 
 **Key config** (overridable via env vars):
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` | `http://localhost:8081/realms/ims` | Keycloak realm issuer URL |
+| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` | *unset (pending Keycloak)* | Keycloak realm issuer URL |
 | `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | `http://localhost:8761/eureka` | Eureka server URL |
+| `DISCOVERY_HOST` | `localhost` | Eureka host for service discovery |
+
+> **Note**: JWT validation is disabled until Keycloak is deployed. The gateway currently permits all requests for local development.
 
 ---
 
@@ -196,20 +206,20 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 
 | Attribute | Value |
 |-----------|-------|
-| Port | 8082 |
+| Port | 8081 |
 | Package | `services/incident-service` |
 | Role | Incident CRUD, state machine, domain events, outbox pattern |
 | Dependencies | `postgres`, `rabbitmq`, `discovery-service` |
 | Test command | `./mvnw test -pl services/incident-service` |
 | Start command | `./mvnw spring-boot:run -pl services/incident-service` |
-| Health endpoint | http://localhost:8082/actuator/health |
-| API docs | http://localhost:8082/scalar |
+| Health endpoint | http://localhost:8081/actuator/health |
+| API docs | http://localhost:8081/scalar |
 
 **Architecture**: Hexagonal (ports & adapters)
 - `domain/` — `Incident`, `IncidentId`, `IncidentStatus`, `IncidentPriority`, `IncidentDomainService`
-- `domain/port/out/` — `IncidentRepository`, `IncidentEventPublisher`
+- `domain/port/out/` — `IncidentRepository`, `IncidentEventPublisher` (outbox writer), `EventPublisher` (broker forwarder)
 - `adapter/out/persistence/` — JPA entities, `IncidentPersistenceAdapter`
-- `adapter/out/messaging/` — `RabbitMqEventPublisher`, `OutboxPoller`
+- `adapter/out/messaging/` — `RabbitMqEventPublisher` (implements `EventPublisher`), `OutboxPoller`
 - `adapter/out/feign/` — `UserServiceClient` (Feign + CircuitBreaker)
 - `adapter/in/rest/` — REST controller, DTOs, MapStruct mappers
 
@@ -295,14 +305,14 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 
 | Attribute | Value |
 |-----------|-------|
-| Port | 8084 |
+| Port | 8082 |
 | Package | `services/user-service` |
-| Role | User profiles, teams, departments — synced from Keycloak |
-| Dependencies | `postgres`, `discovery-service`, `keycloak` |
+| Role | User profiles, teams, departments — synced from Keycloak (sync pending Keycloak deployment) |
+| Dependencies | `postgres`, `discovery-service`, `keycloak` (planned) |
 | Test command | `./mvnw test -pl services/user-service` |
 | Start command | `./mvnw spring-boot:run -pl services/user-service` |
-| Health endpoint | http://localhost:8084/actuator/health |
-| API docs | http://localhost:8084/scalar |
+| Health endpoint | http://localhost:8082/actuator/health |
+| API docs | http://localhost:8082/scalar |
 
 **Architecture**: Hexagonal (ports & adapters)
 - `domain/` — `User`, `UserId`, `Team`, `TeamId`
@@ -312,13 +322,15 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 - `adapter/out/sync/` — `KeycloakSyncScheduler` (@PostConstruct initial sync + @Scheduled every 5min)
 - `adapter/in/rest/` — `UserController`, DTOs
 
+> **Note**: Keycloak sync is implemented but requires a running Keycloak instance. Currently the service starts with a placeholder Keycloak URL; the sync will fail gracefully until Keycloak is deployed.
+
 **Key config** (overridable via env vars):
 | Env var | Default | Description |
 |---------|---------|-------------|
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/user_db` | PostgreSQL JDBC URL |
 | `SPRING_DATASOURCE_USERNAME` | `postgres` | DB username |
 | `SPRING_DATASOURCE_PASSWORD` | `postgres` | DB password |
-| `KEYCLOAK_ADMIN_SERVER_URL` | `http://localhost:8081` | Keycloak server URL |
+| `KEYCLOAK_ADMIN_SERVER_URL` | `http://localhost:18080` | Keycloak server URL (placeholder — Keycloak not deployed) |
 | `KEYCLOAK_CLIENT_SECRET` | `changeme` | Keycloak admin client secret |
 | `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | `http://localhost:8761/eureka` | Eureka server URL |
 
@@ -343,11 +355,10 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 |----------|-------------|
 | http://localhost:8080 | API Gateway |
 | http://localhost:8761 | Eureka Dashboard |
-| http://localhost:8081 | Keycloak Admin Console |
 | http://localhost:15672 | RabbitMQ Management UI |
-| http://localhost:8082/scalar | Incident Service API Docs |
+| http://localhost:8081/scalar | Incident Service API Docs |
 | http://localhost:8083/scalar | Notification Service API Docs |
-| http://localhost:8084/scalar | User Service API Docs |
+| http://localhost:8082/scalar | User Service API Docs |
 | http://localhost:8080/scalar | Aggregated OpenAPI (via Gateway) |
 
 ## Infrastructure
@@ -356,7 +367,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 |-----------|---------|---------------|---------|-----|
 | PostgreSQL | 16 | `postgres` | 5432 | — |
 | RabbitMQ | 3-management | `rabbitmq` | 5672, 15672 | http://localhost:15672 |
-| Keycloak | 25 | `keycloak` | 8080 (internal), 8081 (host) | http://localhost:8081 |
+| Keycloak | 25 | *planned* | *8081 (planned)* | *http://localhost:8081 (planned)* |
 
 ## Environment Variables
 
@@ -367,13 +378,15 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 RABBITMQ_USER=guest
 RABBITMQ_PASS=guest
-KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=admin
+# KEYCLOAK_ADMIN=admin
+# KEYCLOAK_ADMIN_PASSWORD=admin
 ```
+
+> **Note**: Keycloak variables are commented out — Keycloak is not deployed in the current MVP stack. Uncomment when Keycloak is added.
 
 ## Configuration
 
-Each service has a local `application.yaml` with default settings suitable for local development (localhost URLs, embedded H2 in tests). When the Config Server is running, it overrides these values centrally. Services use `optional:configserver:` so they can start without the Config Server during local development.
+Each service has a local `application.yaml` with default settings suitable for local development (localhost URLs, embedded H2 in tests). **Config Server integration is present but commented out** — services use `optional:configserver:` so they can start without the Config Server during local development. Uncomment the `spring.config.import` blocks when Config Server is deployed.
 
 For Docker Compose deployments, environment variables in `docker-compose.yml` override the local defaults (e.g., `SPRING_DATASOURCE_URL` points to `postgres` hostname).
 

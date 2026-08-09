@@ -36,18 +36,6 @@ services:
       timeout: 5s
       retries: 5
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:25
-    container_name: ims-keycloak
-    ports:
-      - "8081:8080"
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-    command: start-dev
-    volumes:
-      - keycloak_data:/opt/keycloak/data
-
   # ── Application Services ───────────────────────────────────────
 
   discovery-service:
@@ -74,11 +62,9 @@ services:
     depends_on:
       discovery-service:
         condition: service_healthy
-      keycloak:
-        condition: service_started
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/ims
+      DISCOVERY_HOST: discovery-service
 
   incident-service:
     build:
@@ -86,7 +72,7 @@ services:
       dockerfile: services/incident-service/Dockerfile
     container_name: ims-incident
     ports:
-      - "8082:8082"
+      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -128,7 +114,7 @@ services:
       dockerfile: services/user-service/Dockerfile
     container_name: ims-user
     ports:
-      - "8084:8084"
+      - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,10 +125,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
-      KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
 
 volumes:
   postgres_data:
   rabbitmq_data:
-  keycloak_data:

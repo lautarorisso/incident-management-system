@@ -18,9 +18,9 @@ set -euo pipefail
 
 # ---- Configuration ----------------------------------------------------------
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080}"
-INCIDENT_URL="${INCIDENT_URL:-http://localhost:8082}"
+INCIDENT_URL="${INCIDENT_URL:-http://localhost:8081}"
 NOTIFICATION_URL="${NOTIFICATION_URL:-http://localhost:8083}"
-USER_URL="${USER_URL:-http://localhost:8084}"
+USER_URL="${USER_URL:-http://localhost:8082}"
 DISCOVERY_URL="${DISCOVERY_URL:-http://localhost:8761}"
 
 TIMEOUT_SEC="${TIMEOUT_SEC:-120}"
