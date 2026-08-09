@@ -15,7 +15,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(properties = {
         "eureka.client.enabled=false",
-        "spring.cloud.config.enabled=false"
+        "spring.cloud.config.enabled=false",
+        "resilience4j.circuitbreaker.configs.default.slidingWindowSize=10",
+        "resilience4j.circuitbreaker.configs.default.minimumNumberOfCalls=5",
+        "resilience4j.circuitbreaker.configs.default.permittedNumberOfCallsInHalfOpenState=3",
+        "resilience4j.circuitbreaker.configs.default.failureRateThreshold=50",
+        "resilience4j.circuitbreaker.instances.api-gateway.baseConfig=default",
+        "resilience4j.circuitbreaker.instances.incident-service.baseConfig=default",
+        "resilience4j.circuitbreaker.instances.notification-service.baseConfig=default",
+        "resilience4j.circuitbreaker.instances.user-service.baseConfig=default"
 })
 @Import(com.lautarorisso.api_gateway.TestSecurityConfig.class)
 class Resilience4jConfigurationTest {

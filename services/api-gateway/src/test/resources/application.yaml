@@ -1,0 +1,12 @@
+# Test configuration for API Gateway
+# Disables OAuth2 Resource Server auto-configuration for tests
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "http://localhost:9999"  # dummy URI - TestSecurityConfig permits all
+
+# Disable Config Server import for tests
+  config:
+    import: "optional:configserver:"

@@ -4,19 +4,20 @@ server:
 spring:
   application:
     name: api-gateway
-  config:
-    import: "optional:configserver:"
+  # Config Server excluded for now (see design)
+  # config:
+  #   import: "optional:configserver:"
   cloud:
-    config:
-      discovery:
-        enabled: true
-        service-id: config-server
+    # config:
+    #   discovery:
+    #     enabled: true
+    #     service-id: config-server
     gateway:
       server:
         webflux:
           routes:
             - id: discovery-service
-              uri: http://localhost:8761
+              uri: http://${DISCOVERY_HOST:localhost}:8761
               predicates: Path=/eureka/web**
               filters: SetPath=/eureka/web
             - id: incident-service
@@ -49,11 +50,13 @@ spring:
     loadbalancer:
       ribbon:
         enabled: false
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8081/realms/ims
+  # Keycloak excluded for now — JWT validation disabled. Re-enable issuer-uri
+  # when Keycloak is brought back (note: 8081 is now incident-service).
+  # security:
+  #   oauth2:
+  #     resourceserver:
+  #       jwt:
+  #         issuer-uri: http://localhost:8081/realms/ims
 
 eureka:
   instance:
