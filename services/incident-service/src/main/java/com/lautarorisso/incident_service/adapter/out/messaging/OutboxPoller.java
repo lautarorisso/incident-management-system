@@ -4,6 +4,7 @@ import com.lautarorisso.incident_service.adapter.persistence.entity.OutboxEventE
 import com.lautarorisso.incident_service.adapter.persistence.repository.OutboxEventJpaRepository;
 import com.lautarorisso.incident_service.domain.model.IncidentEvent;
 import com.lautarorisso.incident_service.domain.model.IncidentId;
+import com.lautarorisso.incident_service.domain.port.out.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,9 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Scheduled poller that reads unpublished outbox events, publishes them
- * to RabbitMQ via RabbitMqEventPublisher, and marks them as published.
+ * to RabbitMQ via the {@link EventPublisher} port, and marks them as published.
  * <p>
  * Implements the transactional outbox pattern for reliable event delivery.
+ * <p>
+ * Depends on the {@code EventPublisher} port rather than a concrete adapter so
+ * the messaging implementation can be swapped without touching this class.
  */
 @Slf4j
 @Component
@@ -22,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OutboxPoller {
 
     private final OutboxEventJpaRepository outboxRepo;
-    private final RabbitMqEventPublisher eventPublisher;
+    private final EventPublisher eventPublisher;
 
     /**
      * Processes all unpublished outbox events.

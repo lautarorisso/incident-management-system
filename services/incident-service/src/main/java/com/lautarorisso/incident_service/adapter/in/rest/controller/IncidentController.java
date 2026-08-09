@@ -2,7 +2,6 @@ package com.lautarorisso.incident_service.adapter.in.rest.controller;
 
 import com.lautarorisso.incident_service.adapter.in.rest.dto.AssignIncidentRequest;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.CreateIncidentRequest;
-import com.lautarorisso.incident_service.adapter.in.rest.dto.IncidentListItem;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.IncidentResponse;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.TransitionIncidentRequest;
 import com.lautarorisso.incident_service.adapter.in.rest.mapper.IncidentRestMapper;
@@ -21,6 +20,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,11 +32,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * REST controller for Incident CRUD and state machine operations.
@@ -139,13 +140,23 @@ public class IncidentController {
     // --- GET /api/incidents ---
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "List all incidents", description = "Returns a list of all incidents with summary information")
-    @ApiResponse(responseCode = "200", description = "List of incidents")
-    public ResponseEntity<List<IncidentListItem>> listIncidents() {
-        var incidents = listIncidentsUseCase.listIncidents();
-        var items = incidents.stream()
-                .map(mapper::toListItem)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(items);
+    @Operation(summary = "List incidents with filters and pagination",
+            description = "Returns a paginated list of incidents, optionally filtered by status, priority, assignee, or team, ordered by createdAt descending")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Paginated list of incidents")
+    })
+    public ResponseEntity<Page<IncidentResponse>> listIncidents(
+            @Parameter(description = "Filter by status (e.g. OPEN, IN_PROGRESS, RESOLVED, CLOSED)")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "Filter by priority (e.g. LOW, MEDIUM, HIGH, CRITICAL)")
+            @RequestParam(required = false) String priority,
+            @Parameter(description = "Filter by assignee UUID")
+            @RequestParam(required = false) UUID assigneeId,
+            @Parameter(description = "Filter by team UUID")
+            @RequestParam(required = false) UUID teamId,
+            @ParameterObject Pageable pageable) {
+
+        var incidents = listIncidentsUseCase.listIncidents(status, priority, assigneeId, teamId, pageable);
+        return ResponseEntity.ok(incidents.map(mapper::toResponse));
     }
 }

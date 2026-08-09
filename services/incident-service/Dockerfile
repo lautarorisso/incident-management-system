@@ -9,5 +9,5 @@ RUN mvn -pl services/incident-service -am package -DskipTests -B
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/services/incident-service/target/*.jar app.jar
-EXPOSE 8082
+EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]

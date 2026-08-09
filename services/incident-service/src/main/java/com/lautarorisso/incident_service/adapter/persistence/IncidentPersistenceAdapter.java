@@ -1,5 +1,6 @@
 package com.lautarorisso.incident_service.adapter.persistence;
 
+import com.lautarorisso.incident_service.adapter.persistence.entity.IncidentEntity;
 import com.lautarorisso.incident_service.adapter.persistence.entity.OutboxEventEntity;
 import com.lautarorisso.incident_service.adapter.persistence.mapper.IncidentEntityMapper;
 import com.lautarorisso.incident_service.adapter.persistence.repository.IncidentJpaRepository;
@@ -10,6 +11,8 @@ import com.lautarorisso.incident_service.domain.model.IncidentId;
 import com.lautarorisso.incident_service.domain.port.out.IncidentEventPublisher;
 import com.lautarorisso.incident_service.domain.port.out.IncidentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +70,45 @@ public class IncidentPersistenceAdapter implements IncidentRepository, IncidentE
         return incidentRepo.findAll().stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Incident> findIncidents(String status, String priority,
+                                        UUID assigneeId, UUID teamId, Pageable pageable) {
+        return selectByFilters(status, priority, assigneeId, teamId, pageable)
+                .map(mapper::toDomain);
+    }
+
+    /**
+     * Selects the repository query method that matches the filters present.
+     * Evaluation order is significant: status+priority take precedence, then
+     * the assignee/team scoped queries, and finally the unfiltered scan.
+     */
+    private Page<IncidentEntity> selectByFilters(
+            String status, String priority, UUID assigneeId, UUID teamId, Pageable pageable) {
+
+        var repo = incidentRepo;
+        if (status != null && priority != null) {
+            return repo.findByStatusAndPriorityOrderByCreatedAtDesc(status, priority, pageable);
+        }
+        if (assigneeId != null) {
+            return status != null
+                    ? repo.findByAssigneeIdAndStatusOrderByCreatedAtDesc(assigneeId, status, pageable)
+                    : repo.findByAssigneeIdOrderByCreatedAtDesc(assigneeId, pageable);
+        }
+        if (teamId != null) {
+            return status != null
+                    ? repo.findByTeamIdAndStatusOrderByCreatedAtDesc(teamId, status, pageable)
+                    : repo.findByTeamIdOrderByCreatedAtDesc(teamId, pageable);
+        }
+        if (status != null) {
+            return repo.findByStatusOrderByCreatedAtDesc(status, pageable);
+        }
+        if (priority != null) {
+            return repo.findByPriorityOrderByCreatedAtDesc(priority, pageable);
+        }
+        return repo.findAllByOrderByCreatedAtDesc(pageable);
     }
 
     @Override
