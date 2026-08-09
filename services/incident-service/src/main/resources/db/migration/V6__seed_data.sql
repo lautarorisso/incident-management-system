@@ -1,0 +1,78 @@
+-- V6: Datos de prueba realistas (callback afterMigrate)
+-- Objetivo: Poblar BD con datos que ejerciten V2-V5 para probar manualmente
+-- Se ejecuta AUTOMÁTICAMENTE después de CADA migración (Flyway callback)
+-- => Usar ON CONFLICT DO NOTHING para ser idempotente
+--
+-- DATOS A CREAR:
+--
+-- 1. 3 Teams
+--    INSERT INTO teams (id, name, created_at, updated_at) VALUES
+--    (gen_random_uuid(), 'Platform Team', now(), now()),
+--    (gen_random_uuid(), 'Backend Team', now(), now()),
+--    (gen_random_uuid(), 'Frontend Team', now(), now())
+--    ON CONFLICT (id) DO NOTHING;
+--
+-- 2. 8 Users (distribuidos en teams, algunos sin team)
+--    INSERT INTO users (id, username, email, team_id, created_at, updated_at) VALUES
+--    (gen_random_uuid(), 'alice', 'alice@company.com', (SELECT id FROM teams WHERE name='Platform Team'), now(), now()),
+--    (gen_random_uuid(), 'bob', 'bob@company.com', (SELECT id FROM teams WHERE name='Platform Team'), now(), now()),
+--    (gen_random_uuid(), 'carol', 'carol@company.com', (SELECT id FROM teams WHERE name='Backend Team'), now(), now()),
+--    (gen_random_uuid(), 'dave', 'dave@company.com', (SELECT id FROM teams WHERE name='Backend Team'), now(), now()),
+--    (gen_random_uuid(), 'eve', 'eve@company.com', (SELECT id FROM teams WHERE name='Frontend Team'), now(), now()),
+--    (gen_random_uuid(), 'frank', 'frank@company.com', (SELECT id FROM teams WHERE name='Frontend Team'), now(), now()),
+--    (gen_random_uuid(), 'grace', 'grace@company.com', NULL, now(), now()),  -- sin team
+--    (gen_random_uuid(), 'henry', 'henry@company.com', NULL, now(), now())   -- sin team
+--    ON CONFLICT (id) DO NOTHING;
+--
+-- 3. 50 Incidents (estados variados, prioridades, fechas últimos 90 días)
+--    - ~10 OPEN, ~15 IN_PROGRESS, ~15 RESOLVED, ~10 CLOSED
+--    - Prioridades distribuidas
+--    - ~10 con assignee_id NULL (prueba índice parcial V2)
+--    - ~5 con team_id NULL (prueba índice parcial V2)
+--    - Fechas: now() - random() * INTERVAL '90 days'
+--    - Algunos con SLA breached (creados hace > SLA según prioridad)
+--    - Transiciones válidas representadas
+--
+--    INSERT INTO incidents (id, title, description, status, priority, assignee_id, team_id, created_at, updated_at)
+--    SELECT
+--        gen_random_uuid(),
+--        'Incident ' || gs || ': ' || 
+--            CASE WHEN random() < 0.3 THEN 'Database connection timeout'
+--                 WHEN random() < 0.5 THEN 'API latency spike'
+--                 WHEN random() < 0.7 THEN 'Memory leak in worker'
+--                 ELSE 'Authentication failure' END,
+--        'Auto-generated test incident for SQL practice',
+--        CASE WHEN random() < 0.2 THEN 'OPEN'
+--             WHEN random() < 0.5 THEN 'IN_PROGRESS'
+--             WHEN random() < 0.8 THEN 'RESOLVED'
+--             ELSE 'CLOSED' END,
+--        CASE WHEN random() < 0.25 THEN 'LOW'
+--             WHEN random() < 0.5 THEN 'MEDIUM'
+--             WHEN random() < 0.75 THEN 'HIGH'
+--             ELSE 'CRITICAL' END,
+--        CASE WHEN random() < 0.2 THEN NULL  -- 20% sin assignee
+--             ELSE (SELECT id FROM users ORDER BY random() LIMIT 1) END,
+--        CASE WHEN random() < 0.1 THEN NULL  -- 10% sin team
+--             ELSE (SELECT id FROM teams ORDER BY random() LIMIT 1) END,
+--        now() - (random() * INTERVAL '90 days'),
+--        now() - (random() * INTERVAL '30 days')
+--    FROM generate_series(1, 50) gs
+--    ON CONFLICT (id) DO NOTHING;
+--
+-- 4. 10 Outbox events pendientes (published=false)
+--    INSERT INTO outbox_events (id, event_type, payload, published, created_at)
+--    SELECT gen_random_uuid(),
+--           CASE WHEN random() < 0.5 THEN 'INCIDENT_CREATED' ELSE 'INCIDENT_TRANSITIONED' END,
+--           jsonb_build_object('incidentId', gen_random_uuid(), 'test', true),
+--           false,
+--           now() - (random() * INTERVAL '7 days')
+--    FROM generate_series(1, 10)
+--    ON CONFLICT (id) DO NOTHING;
+--
+-- NOTAS:
+-- - ON CONFLICT DO NOTHING requiere PK o UNIQUE constraint en la tabla
+--   incidents.id y outbox_events.id son PK -> OK
+-- - teams/users pueden no tener PK en name -> usar DO NOTHING en id (gen_random_uuid)
+-- - Ejecutar manualmente en psql para probar: \i V6__seed_data.sql
+
+-- TODO: Escribir aquí los 4 bloques INSERT ...

@@ -1,0 +1,163 @@
+-- V4: Stored Procedures para operaciones críticas atómicas
+-- Objetivo: Encapsular asignación y transición de estado con validación, auditoría y outbox en una transacción BD
+--
+-- PROCEDIMIENTOS A CREAR:
+--
+-- 1. sp_assign_incident(p_incident_id UUID, p_assignee_id UUID, p_assigned_by UUID)
+--    Hace atómicamente:
+--      - Valida que incident exista
+--      - Valida estado actual IN ('OPEN', 'IN_PROGRESS')  -- OPEN->IN_PROGRESS al asignar
+--      - Valida que assignee exista (en users table - requiere dblink o check en app)
+--      - FOR UPDATE SKIP LOCKED en incident (evita deadlocks bajo concurrencia)
+--      - Actualiza: assignee_id = p_assignee_id, status = 'IN_PROGRESS', updated_at = now()
+--      - Inserta outbox_event (INCIDENT_ASSIGNED)
+--      - Retorna incident actualizado
+--    Manejo errores: EXCEPTION WHEN, SAVEPOINT, RAISE con SQLSTATE custom, GET STACKED DIAGNOSTICS
+--    Transacción: Si falla outbox -> ROLLBACK TO savepoint
+--
+--    CREATE OR REPLACE PROCEDURE sp_assign_incident(
+--        p_incident_id UUID,
+--        p_assignee_id UUID,
+--        p_assigned_by UUID
+--    )
+--    LANGUAGE plpgsql
+--    AS $$
+--    DECLARE
+--        v_incident incidents%ROWTYPE;
+--        v_savepoint TEXT := 'sp_assign_savepoint';
+--        v_sqlstate TEXT;
+--        v_msg TEXT;
+--    BEGIN
+--        SAVEPOINT sp_assign_savepoint;
+--
+--        -- Lock fila incident para evitar race condition
+--        SELECT * INTO v_incident
+--        FROM incidents
+--        WHERE id = p_incident_id
+--        FOR UPDATE SKIP LOCKED;
+--
+--        IF NOT FOUND THEN
+--            RAISE EXCEPTION 'Incident % not found', p_incident_id
+--                USING ERRCODE = 'P0001';
+--        END IF;
+--
+--        IF v_incident.status NOT IN ('OPEN', 'IN_PROGRESS') THEN
+--            RAISE EXCEPTION 'Cannot assign incident in status %', v_incident.status
+--                USING ERRCODE = 'P0002';
+--        END IF;
+--
+--        -- Validar assignee existe (opcional: dblink a user_db o check en app layer)
+--        -- PERFORM 1 FROM users WHERE id = p_assignee_id; -- si misma BD
+--
+--        -- Actualizar incident
+--        UPDATE incidents
+--        SET assignee_id = p_assignee_id,
+--            status = 'IN_PROGRESS',
+--            updated_at = now()
+--        WHERE id = p_incident_id;
+--
+--        -- Insertar outbox event
+--        INSERT INTO outbox_events (id, event_type, payload, published, created_at)
+--        VALUES (gen_random_uuid(), 'INCIDENT_ASSIGNED',
+--                jsonb_build_object('incidentId', p_incident_id, 'assigneeId', p_assignee_id, 'assignedBy', p_assigned_by),
+--                false, now());
+--
+--        -- Retornar incident actualizado
+--        SELECT * INTO v_incident FROM incidents WHERE id = p_incident_id;
+--        RAISE NOTICE 'Incident assigned: %', v_incident;
+--
+--    EXCEPTION
+--        WHEN OTHERS THEN
+--            GET STACKED DIAGNOSTICS v_sqlstate = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT;
+--            ROLLBACK TO SAVEPOINT v_savepoint;
+--            RAISE EXCEPTION 'sp_assign_incident failed: % - %', v_sqlstate, v_msg
+--                USING ERRCODE = v_sqlstate;
+--    END;
+--    $$;
+--
+-- 2. sp_transition_incident(p_incident_id UUID, p_new_status TEXT, p_actor_id UUID)
+--    Hace atómicamente:
+--      - Valida incidente existe
+--      - Valida transición según máquina de estados:
+--          OPEN -> IN_PROGRESS, RESOLVED
+--          IN_PROGRESS -> RESOLVED, OPEN (reopen)
+--          RESOLVED -> CLOSED, OPEN (reopen)
+--          CLOSED -> (ninguna, estado terminal)
+--      - FOR UPDATE SKIP LOCKED
+--      - Actualiza: status = p_new_status, updated_at = now()
+--      - Inserta outbox_event (INCIDENT_TRANSITIONED)
+--      - (V5 trigger auditoría capturará el cambio automáticamente)
+--      - Retorna incident actualizado
+--    Manejo errores: igual que arriba
+--    Cursor: Para validar transiciones, se puede usar un cursor sobre una tabla de transiciones válidas
+--
+--    CREATE OR REPLACE PROCEDURE sp_transition_incident(
+--        p_incident_id UUID,
+--        p_new_status TEXT,
+--        p_actor_id UUID
+--    )
+--    LANGUAGE plpgsql
+--    AS $$
+--    DECLARE
+--        v_incident incidents%ROWTYPE;
+--        v_savepoint TEXT := 'sp_transition_savepoint';
+--        v_valid_transition BOOLEAN;
+--        v_sqlstate TEXT;
+--        v_msg TEXT;
+--    BEGIN
+--        SAVEPOINT v_savepoint;
+--
+--        SELECT * INTO v_incident
+--        FROM incidents
+--        WHERE id = p_incident_id
+--        FOR UPDATE SKIP LOCKED;
+--
+--        IF NOT FOUND THEN
+--            RAISE EXCEPTION 'Incident % not found', p_incident_id
+--                USING ERRCODE = 'P0001';
+--        END IF;
+--
+--        -- Validar transición usando matriz (también se puede usar tabla de transición)
+--        v_valid_transition := CASE
+--            WHEN v_incident.status = 'OPEN'       AND p_new_status IN ('IN_PROGRESS', 'RESOLVED') THEN true
+--            WHEN v_incident.status = 'IN_PROGRESS' AND p_new_status IN ('RESOLVED', 'OPEN') THEN true
+--            WHEN v_incident.status = 'RESOLVED'   AND p_new_status IN ('CLOSED', 'OPEN') THEN true
+--            WHEN v_incident.status = 'CLOSED'     AND p_new_status = 'CLOSED' THEN true  -- idempotente
+--            ELSE false
+--        END;
+--
+--        IF NOT v_valid_transition THEN
+--            RAISE EXCEPTION 'Invalid transition from % to %', v_incident.status, p_new_status
+--                USING ERRCODE = 'P0003';
+--        END IF;
+--
+--        IF v_incident.status = p_new_status THEN
+--            -- Idempotente: mismo estado, no hacer nada
+--            SELECT * INTO v_incident FROM incidents WHERE id = p_incident_id;
+--            RAISE NOTICE 'Incident already in status %', p_new_status;
+--            RETURN;
+--        END IF;
+--
+--        UPDATE incidents
+--        SET status = p_new_status,
+--            updated_at = now()
+--        WHERE id = p_incident_id;
+--
+--        INSERT INTO outbox_events (id, event_type, payload, published, created_at)
+--        VALUES (gen_random_uuid(), 'INCIDENT_TRANSITIONED',
+--                jsonb_build_object('incidentId', p_incident_id, 'fromStatus', v_incident.status, 'toStatus', p_new_status, 'actorId', p_actor_id),
+--                false, now());
+--
+--        SELECT * INTO v_incident FROM incidents WHERE id = p_incident_id;
+--        RAISE NOTICE 'Incident transitioned: % -> %', v_incident.status, p_new_status;
+--
+--    EXCEPTION
+--        WHEN OTHERS THEN
+--            GET STACKED DIAGNOSTICS v_sqlstate = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT;
+--            ROLLBACK TO SAVEPOINT v_savepoint;
+--            RAISE EXCEPTION 'sp_transition_incident failed: % - %', v_sqlstate, v_msg
+--                USING ERRCODE = v_sqlstate;
+--    END;
+--    $$;
+
+-- TODO: Escribir aquí los 2 stored procedures ...

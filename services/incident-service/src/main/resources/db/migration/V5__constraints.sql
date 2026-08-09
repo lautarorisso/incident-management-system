@@ -1,0 +1,36 @@
+-- V5: CHECK Constraints para validación a nivel BD
+-- Objetivo: Impedir datos inválidos aunque vengan de SQL raw, scripts, migraciones, etc.
+-- NO incluye triggers (auditoría/outbox auto-publish) - fuera de alcance por ahora
+--
+-- CONSTRAINTS A CREAR:
+--
+-- 1. chk_incident_status_valid
+--    Valida: status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')
+--    Coincide con IncidentStatus enum en Java
+--
+--    ALTER TABLE incidents
+--    ADD CONSTRAINT chk_incident_status_valid
+--    CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'));
+--
+-- 2. chk_incident_priority_valid
+--    Valida: priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')
+--    Coincide con IncidentPriority enum en Java
+--
+--    ALTER TABLE incidents
+--    ADD CONSTRAINT chk_incident_priority_valid
+--    CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'));
+--
+-- 3. chk_outbox_event_type_not_empty
+--    Valida: event_type no vacío
+--
+--    ALTER TABLE outbox_events
+--    ADD CONSTRAINT chk_outbox_event_type_not_empty
+--    CHECK (event_type <> '');
+--
+-- NOTAS:
+-- - Estas constraints son NOT VALID por defecto en ALTER TABLE
+--   => Para validar datos existentes: ALTER TABLE ... VALIDATE CONSTRAINT ...
+-- - Si hay datos sucios, VALIDATE fallará. Limpiar primero o crear NOT VALID.
+-- - Probar: INSERT con status='INVALID' -> debe fallar con SQLSTATE 23514
+
+-- TODO: Escribir aquí los 3 ALTER TABLE ... ADD CONSTRAINT ...

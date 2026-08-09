@@ -1,0 +1,99 @@
+-- V3: Funciones SQL para agregaciones, SLA y próximas acciones
+-- Objetivo: Mover lógica de negocio que hoy está en Java (N queries + memoria) a BD (1 scan)
+--
+-- FUNCIONES A CREAR:
+--
+-- 1. fn_incident_stats(team_id UUID, since TIMESTAMPTZ)
+--    Retorna: TABLE(status TEXT, priority TEXT, cnt BIGINT, avg_age INTERVAL)
+--    Uso: Dashboard stats por team en ventana temporal
+--    Conceptos: RETURNS TABLE, CTE, GROUP BY, window functions, $1 $2 params
+--    Performance: STABLE, PARALLEL SAFE, <5ms con 50k rows
+--
+--    CREATE OR REPLACE FUNCTION fn_incident_stats(p_team_id UUID, p_since TIMESTAMPTZ)
+--    RETURNS TABLE(status TEXT, priority TEXT, cnt BIGINT, avg_age INTERVAL)
+--    LANGUAGE sql
+--    STABLE PARALLEL SAFE
+--    AS $$
+--        SELECT i.status, i.priority, COUNT(*) AS cnt,
+--               AVG(now() - i.created_at) AS avg_age
+--        FROM incidents i
+--        WHERE i.team_id = p_team_id
+--          AND i.created_at >= p_since
+--        GROUP BY i.status, i.priority;
+--    $$;
+--
+-- 2. fn_incident_sla(incident_id UUID)
+--    Retorna: TABLE(breached BOOLEAN, remaining INTERVAL, next_action TEXT)
+--    Uso: Saber si un incident rompió SLA y qué acción sigue
+--    Lógica SLA por prioridad:
+--      CRITICAL: 4h  | HIGH: 24h | MEDIUM: 72h | LOW: 30d
+--      next_action: breached->ESCALATE, remaining<=50%->ACKNOWLEDGE, else->MONITOR
+--    Conceptos: CASE, INTERVAL arithmetic, RETURNS TABLE
+--
+--    CREATE OR REPLACE FUNCTION fn_incident_sla(p_incident_id UUID)
+--    RETURNS TABLE(breached BOOLEAN, remaining INTERVAL, next_action TEXT)
+--    LANGUAGE plpgsql
+--    STABLE
+--    AS $$
+--    DECLARE
+--        v_incident RECORD;
+--        v_sla_interval INTERVAL;
+--        v_elapsed INTERVAL;
+--    BEGIN
+--        SELECT * INTO v_incident FROM incidents WHERE id = p_incident_id;
+--        IF NOT FOUND THEN
+--            RAISE EXCEPTION 'Incident % not found', p_incident_id USING ERRCODE = 'P0001';
+--        END IF;
+--
+--        v_sla_interval := CASE v_incident.priority
+--            WHEN 'CRITICAL' THEN INTERVAL '4 hours'
+--            WHEN 'HIGH'     THEN INTERVAL '24 hours'
+--            WHEN 'MEDIUM'   THEN INTERVAL '72 hours'
+--            WHEN 'LOW'      THEN INTERVAL '30 days'
+--            ELSE INTERVAL '24 hours'
+--        END;
+--
+--        v_elapsed := now() - v_incident.created_at;
+--        breached := v_elapsed > v_sla_interval;
+--        remaining := v_sla_interval - v_elapsed;
+--        next_action := CASE
+--            WHEN breached THEN 'ESCALATE'
+--            WHEN v_elapsed >= (v_sla_interval * 0.5) THEN 'ACKNOWLEDGE'
+--            ELSE 'MONITOR'
+--        END;
+--        RETURN NEXT;
+--    END;
+--    $$;
+--
+-- 3. fn_next_action_for_assignee(user_id UUID)
+--    Retorna: SETOF incidents (hasta 5, ordenados por urgencia SLA)
+--    Uso: "Qué debo hacer ahora" para un assignee
+--    Filtra: solo OPEN, IN_PROGRESS
+--    Orden: breached DESC, remaining ASC, priority DESC, created_at ASC
+--    Conceptos: RETURNS SETOF, CTE con fn_incident_sla, LIMIT
+--
+--    CREATE OR REPLACE FUNCTION fn_next_action_for_assignee(p_user_id UUID)
+--    RETURNS SETOF incidents
+--    LANGUAGE plpgsql
+--    STABLE
+--    AS $$
+--    DECLARE
+--        r incidents%ROWTYPE;
+--    BEGIN
+--        FOR r IN
+--            SELECT i.*
+--            FROM incidents i
+--            CROSS JOIN LATERAL fn_incident_sla(i.id) sla
+--            WHERE i.assignee_id = p_user_id
+--              AND i.status IN ('OPEN', 'IN_PROGRESS')
+--            ORDER BY sla.breached DESC, sla.remaining ASC,
+--                     CASE i.priority WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END DESC,
+--                     i.created_at ASC
+--            LIMIT 5
+--        LOOP
+--            RETURN NEXT r;
+--        END LOOP;
+--    END;
+--    $$;
+
+-- TODO: Escribir aquí las 3 funciones ...
