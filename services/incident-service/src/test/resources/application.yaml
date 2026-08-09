@@ -1,0 +1,22 @@
+# Test configuration for Incident Service
+# Disables OAuth2 Resource Server auto-configuration for tests
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "http://localhost:9999"  # dummy URI
+
+# Disable Config Server import for tests
+  config:
+    import: "optional:configserver:"
+
+# Disable Eureka client for tests
+eureka:
+  client:
+    enabled: false
+
+# Disable RabbitMQ for tests
+  rabbitmq:
+    host: localhost
+    port: 5672

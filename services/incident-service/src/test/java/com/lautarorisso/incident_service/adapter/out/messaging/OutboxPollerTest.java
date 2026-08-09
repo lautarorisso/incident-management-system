@@ -4,6 +4,7 @@ import com.lautarorisso.incident_service.adapter.persistence.entity.OutboxEventE
 import com.lautarorisso.incident_service.adapter.persistence.repository.OutboxEventJpaRepository;
 import com.lautarorisso.incident_service.domain.model.IncidentEvent;
 import com.lautarorisso.incident_service.domain.model.IncidentId;
+import com.lautarorisso.incident_service.domain.port.out.EventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +31,7 @@ class OutboxPollerTest {
     private OutboxEventJpaRepository outboxRepo;
 
     @Mock
-    private RabbitMqEventPublisher eventPublisher;
+    private EventPublisher eventPublisher;
 
     private OutboxPoller poller;
 

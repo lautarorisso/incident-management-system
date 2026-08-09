@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lautarorisso.incident_service.adapter.in.rest.controller.IncidentController;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.AssignIncidentRequest;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.CreateIncidentRequest;
-import com.lautarorisso.incident_service.adapter.in.rest.dto.IncidentListItem;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.IncidentResponse;
 import com.lautarorisso.incident_service.adapter.in.rest.dto.TransitionIncidentRequest;
 import com.lautarorisso.incident_service.adapter.in.rest.mapper.IncidentRestMapper;
@@ -20,6 +19,7 @@ import com.lautarorisso.incident_service.domain.port.in.TransitionIncidentUseCas
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -324,39 +324,47 @@ class IncidentControllerTest {
                 .updatedAt(now)
                 .build();
 
-        var item1 = IncidentListItem.builder()
+        var response1 = IncidentResponse.builder()
                 .id(domain1.getId().getValue())
                 .title("Incident A")
+                .description("Desc A")
                 .status("OPEN")
                 .priority("LOW")
                 .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        var item2 = IncidentListItem.builder()
+        var response2 = IncidentResponse.builder()
                 .id(domain2.getId().getValue())
                 .title("Incident B")
+                .description("Desc B")
                 .status("RESOLVED")
                 .priority("HIGH")
                 .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        when(listIncidentsUseCase.listIncidents()).thenReturn(List.of(domain1, domain2));
-        when(mapper.toListItem(domain1)).thenReturn(item1);
-        when(mapper.toListItem(domain2)).thenReturn(item2);
+        when(listIncidentsUseCase.listIncidents(any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(domain1, domain2)));
+        when(mapper.toResponse(domain1)).thenReturn(response1);
+        when(mapper.toResponse(domain2)).thenReturn(response2);
 
         mockMvc.perform(get("/api/incidents"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].title").value("Incident A"))
-                .andExpect(jsonPath("$[1].title").value("Incident B"));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Incident A"))
+                .andExpect(jsonPath("$.content[1].title").value("Incident B"));
     }
 
     @Test
-    void shouldReturnEmptyListWhenNoIncidents() throws Exception {
-        when(listIncidentsUseCase.listIncidents()).thenReturn(List.of());
+    void shouldReturnEmptyPageWhenNoIncidents() throws Exception {
+        when(listIncidentsUseCase.listIncidents(any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/incidents"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 }

@@ -16,6 +16,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -178,8 +180,10 @@ class IncidentUseCaseIntegrationTest {
         createIncidentUseCase.createIncident("Second", "Second incident", IncidentPriority.HIGH);
         createIncidentUseCase.createIncident("Third", "Third incident", IncidentPriority.CRITICAL);
 
-        var all = listIncidentsUseCase.listIncidents();
-        assertTrue(all.size() >= 3);
+        var all = listIncidentsUseCase.listIncidents(
+                null, null, null, null,
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")));
+        assertTrue(all.getTotalElements() >= 3);
     }
 
     @Test
