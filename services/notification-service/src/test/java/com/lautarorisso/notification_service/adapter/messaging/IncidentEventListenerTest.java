@@ -4,6 +4,7 @@ import com.lautarorisso.notification_service.adapter.out.messaging.IncidentEvent
 import com.lautarorisso.notification_service.domain.model.NotificationType;
 import com.lautarorisso.notification_service.domain.model.ProcessedEvent;
 import com.lautarorisso.notification_service.domain.port.out.NotificationRepository;
+import com.lautarorisso.notification_service.domain.port.out.NotificationSender;
 import com.lautarorisso.notification_service.domain.port.out.ProcessedEventRepository;
 import com.lautarorisso.notification_service.domain.service.NotificationRoutingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ class IncidentEventListenerTest {
     @Mock
     private NotificationRoutingService routingService;
 
+    @Mock
+    private NotificationSender notificationSender;
+
     private IncidentEventListener listener;
 
     @Captor
@@ -45,7 +49,7 @@ class IncidentEventListenerTest {
     @BeforeEach
     void setUp() {
         listener = new IncidentEventListener(
-                processedEventRepository, notificationRepository, routingService);
+                processedEventRepository, notificationRepository, routingService, notificationSender);
     }
 
     @Test
@@ -67,7 +71,8 @@ class IncidentEventListenerTest {
 
         listener.handleIncidentEvent(event, eventId);
 
-        verify(notificationRepository, times(1)).save(argThat(n ->
+        // save called twice: once for UNREAD, once for SENT
+        verify(notificationRepository, times(2)).save(argThat(n ->
                 n.getUserId().equals(assigneeId) &&
                 n.getType() == NotificationType.INCIDENT_ASSIGNED
         ));
@@ -122,7 +127,8 @@ class IncidentEventListenerTest {
 
         listener.handleIncidentEvent(event, eventId);
 
-        verify(notificationRepository, times(2)).save(argThat(n ->
+        // save called 4 times: 2 users x 2 saves each (UNREAD + SENT)
+        verify(notificationRepository, times(4)).save(argThat(n ->
                 n.getUserId().equals(user1) || n.getUserId().equals(user2)
         ));
     }

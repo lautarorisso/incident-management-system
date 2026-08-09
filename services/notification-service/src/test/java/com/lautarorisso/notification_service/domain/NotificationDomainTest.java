@@ -54,8 +54,11 @@ class NotificationDomainTest {
 
     @Test
     void notificationStatusHasExpectedValues() {
-        assertEquals(2, NotificationStatus.values().length);
+        assertEquals(5, NotificationStatus.values().length);
         assertNotNull(NotificationStatus.valueOf("UNREAD"));
+        assertNotNull(NotificationStatus.valueOf("SENT"));
+        assertNotNull(NotificationStatus.valueOf("DELIVERED"));
+        assertNotNull(NotificationStatus.valueOf("FAILED"));
         assertNotNull(NotificationStatus.valueOf("READ"));
     }
 

@@ -12,6 +12,15 @@ spring:
   rabbitmq:
     listener:
       auto-startup: false
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
   cloud:
     discovery:
       enabled: false
@@ -23,6 +32,10 @@ spring:
     exclude:
       - org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration
       - org.springframework.cloud.client.discovery.composite.CompositeDiscoveryClientAutoConfiguration
+
+notification:
+  email:
+    enabled: false
 
 eureka:
   client:
