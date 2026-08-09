@@ -1,16 +1,17 @@
 server:
-  port: 8084
+  port: 8082
 
 spring:
   application:
     name: user-service
-  config:
-    import: "optional:configserver:"
+  # Config Server excluded for now (see design)
+  # config:
+  #   import: "optional:configserver:"
   cloud:
-    config:
-      discovery:
-        enabled: true
-        service-id: config-server
+    # config:
+    #   discovery:
+    #     enabled: true
+    #     service-id: config-server
     loadbalancer:
       ribbon:
         enabled: false
@@ -61,9 +62,11 @@ resilience4j:
       user-service:
         baseConfig: default
 
+# Keycloak excluded for now — block kept because KeycloakConfig bean requires
+# these properties at startup. Placeholder port (no service listens on 18080).
 keycloak:
   admin:
-    server-url: http://localhost:8081
+    server-url: http://localhost:18080
     realm: master
     client-id: admin-cli
     client-secret: ${KEYCLOAK_CLIENT_SECRET:changeme}
