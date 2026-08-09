@@ -6,6 +6,7 @@ import com.lautarorisso.notification_service.domain.model.NotificationStatus;
 import com.lautarorisso.notification_service.domain.model.NotificationType;
 import com.lautarorisso.notification_service.domain.model.ProcessedEvent;
 import com.lautarorisso.notification_service.domain.port.out.NotificationRepository;
+import com.lautarorisso.notification_service.domain.port.out.NotificationSender;
 import com.lautarorisso.notification_service.domain.port.out.ProcessedEventRepository;
 import com.lautarorisso.notification_service.domain.service.NotificationRoutingService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class IncidentEventListener {
     private final ProcessedEventRepository processedEventRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationRoutingService routingService;
+    private final NotificationSender notificationSender;
 
     /**
      * Handles an incoming incident event from RabbitMQ.
@@ -82,6 +84,16 @@ public class IncidentEventListener {
 
             notificationRepository.save(notification);
             log.info("Created notification {} for user {}", notification.getId(), userId);
+
+            // Send the notification via email (or other channels)
+            try {
+                notificationSender.send(notification);
+                notification.markAsSent();
+                notificationRepository.save(notification);
+            } catch (Exception e) {
+                log.error("Failed to deliver notification {}: {}", notification.getId(), e.getMessage());
+                // Notification stays as UNREAD/SENT_FAILED for retry
+            }
         }
 
         // Mark event as processed

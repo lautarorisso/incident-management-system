@@ -51,4 +51,32 @@ public class Notification {
                 .createdAt(this.createdAt)
                 .build();
     }
+
+    /**
+     * Returns a new Notification marked as SENT.
+     */
+    public Notification markAsSent() {
+        return withStatus(NotificationStatus.SENT);
+    }
+
+    /**
+     * Returns a new Notification marked as DELIVERED.
+     */
+    public Notification markAsDelivered() {
+        return withStatus(NotificationStatus.DELIVERED);
+    }
+
+    /**
+     * Returns a new Notification marked as FAILED.
+     */
+    public Notification markAsFailed() {
+        return withStatus(NotificationStatus.FAILED);
+    }
+
+    /**
+     * Returns a new Notification marked as READ.
+     */
+    public Notification markAsRead() {
+        return withStatus(NotificationStatus.READ);
+    }
 }
