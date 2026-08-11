@@ -4,9 +4,8 @@ server:
 spring:
   application:
     name: incident-service
-  # Config Server excluded for now (see design)
-  # config:
-  #   import: "optional:configserver:"
+  config:
+    import: "optional:configserver:http://homelab:8888"
   cloud:
     # config:
     #   discovery:
