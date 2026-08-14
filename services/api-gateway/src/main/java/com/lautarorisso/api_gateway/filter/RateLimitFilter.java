@@ -1,7 +1,10 @@
 package com.lautarorisso.api_gateway.filter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -11,40 +14,41 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Global filter that rate-limits requests per client using a token bucket
- * algorithm. The client is identified by the X-Forwarded-For header, or
- * falls back to the remote address.
+ * Global filter that rate-limits requests per client using Resilience4j's
+ * {@link RateLimiter}. The client is identified by the X-Forwarded-For header,
+ * or falls back to the remote address.
  * <p>
- * When the bucket is empty, responds with HTTP 429 Too Many Requests.
+ * When the rate limit is exceeded, responds with HTTP 429 Too Many Requests.
  */
+@Slf4j
 @Component
 public class RateLimitFilter implements GlobalFilter, Ordered {
 
-    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
     private static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
-    private final ConcurrentMap<String, TokenBucket> buckets = new ConcurrentHashMap<>();
-    private final int capacity;
-    private final int refillRatePerSecond;
+    private final RateLimiterRegistry rateLimiterRegistry;
+    private final ConcurrentMap<String, RateLimiter> buckets = new ConcurrentHashMap<>();
 
     /**
-     * Creates a rate-limit filter with the given capacity and refill rate.
+     * Creates a rate-limit filter backed by Resilience4j.
      *
-     * @param capacity           maximum tokens per client
-     * @param refillRatePerSecond tokens added per second
+     * @param limitForPeriod maximum requests per refresh period per client
+     * @param refreshPeriod  ISO-8601 duration of each rate-limit window (e.g. "5s")
      */
-    public RateLimitFilter(int capacity, int refillRatePerSecond) {
-        this.capacity = capacity;
-        this.refillRatePerSecond = refillRatePerSecond;
-    }
-
-    /** Default constructor used by Spring — 10 tokens capacity, 2 refill per second. */
-    public RateLimitFilter() {
-        this(10, 2);
+    public RateLimitFilter(
+            @Value("${app.rate-limit.limit-for-period:10}") int limitForPeriod,
+            @Value("${app.rate-limit.refresh-period:5s}") Duration refreshPeriod) {
+        RateLimiterConfig config = RateLimiterConfig.custom()
+                .limitForPeriod(limitForPeriod)
+                .limitRefreshPeriod(refreshPeriod)
+                .timeoutDuration(Duration.ZERO)
+                .build();
+        this.rateLimiterRegistry = RateLimiterRegistry.of(config);
     }
 
     @Override
@@ -55,10 +59,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String clientKey = resolveClientKey(exchange.getRequest());
-        TokenBucket bucket = buckets.computeIfAbsent(clientKey,
-                k -> new TokenBucket(capacity, refillRatePerSecond));
+        RateLimiter rateLimiter = buckets.computeIfAbsent(clientKey,
+                k -> rateLimiterRegistry.rateLimiter(k));
 
-        if (bucket.tryConsume()) {
+        if (rateLimiter.acquirePermission()) {
             return chain.filter(exchange);
         }
 
@@ -81,47 +85,5 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             return request.getRemoteAddress().getHostString();
         }
         return "unknown";
-    }
-
-    /**
-     * Simple token bucket with time-based refill. Not thread-safe per bucket;
-     * callers must synchronize access per bucket instance.
-     */
-    static class TokenBucket {
-        private final int capacity;
-        private final long refillIntervalNanos;
-        private double tokens;
-        private long lastRefillNanos;
-
-        TokenBucket(int capacity, int refillRatePerSecond) {
-            this.capacity = capacity;
-            this.refillIntervalNanos = 1_000_000_000L / refillRatePerSecond;
-            this.tokens = capacity;
-            this.lastRefillNanos = System.nanoTime();
-        }
-
-        synchronized boolean tryConsume() {
-            refill();
-            if (tokens >= 1.0) {
-                tokens -= 1.0;
-                return true;
-            }
-            return false;
-        }
-
-        private void refill() {
-            long now = System.nanoTime();
-            long elapsed = now - lastRefillNanos;
-            if (elapsed >= refillIntervalNanos) {
-                double tokensToAdd = (double) elapsed / refillIntervalNanos;
-                tokens = Math.min(capacity, tokens + tokensToAdd);
-                lastRefillNanos = now;
-            }
-        }
-
-        // Visible for testing
-        double getTokens() {
-            return tokens;
-        }
     }
 }

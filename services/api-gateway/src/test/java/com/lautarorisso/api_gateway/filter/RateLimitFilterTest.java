@@ -9,6 +9,8 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RateLimitFilterTest {
@@ -20,7 +22,8 @@ class RateLimitFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new RateLimitFilter(2, 1); // capacity=2, refill=1 per second
+        // limitForPeriod=2, refreshPeriod=1s
+        filter = new RateLimitFilter(2, Duration.ofSeconds(1));
         chain = exchange -> Mono.empty();
     }
 
@@ -48,7 +51,7 @@ class RateLimitFilterTest {
                 .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.2", 8080))
                 .build();
 
-        // First 2 requests should pass (capacity = 2)
+        // First 2 requests should pass (limit-for-period = 2)
         ServerWebExchange exchange1 = MockServerWebExchange.from(request);
         filter.filter(exchange1, chain).block();
 
