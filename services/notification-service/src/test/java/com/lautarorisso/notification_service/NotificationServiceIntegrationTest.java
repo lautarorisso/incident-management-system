@@ -1,10 +1,10 @@
 package com.lautarorisso.notification_service;
 
-import com.lautarorisso.notification_service.adapter.out.messaging.IncidentEventListener;
-import com.lautarorisso.notification_service.domain.model.Notification;
-import com.lautarorisso.notification_service.domain.model.NotificationStatus;
-import com.lautarorisso.notification_service.domain.port.out.NotificationRepository;
-import com.lautarorisso.notification_service.domain.port.out.ProcessedEventRepository;
+import com.lautarorisso.notification_service.entity.Notification;
+import com.lautarorisso.notification_service.entity.NotificationStatus;
+import com.lautarorisso.notification_service.messaging.IncidentEventListener;
+import com.lautarorisso.notification_service.repository.NotificationRepository;
+import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,27 +31,26 @@ class NotificationServiceIntegrationTest {
 
     @Test
     void fullFlowConsumesEventAndPersistsNotification() {
-        String eventId = UUID.randomUUID().toString();
         UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
 
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_ASSIGNED",
-                "incidentId", UUID.randomUUID().toString(),
+                "incidentId", incidentId,
                 "assigneeId", assigneeId.toString(),
                 "changedBy", UUID.randomUUID().toString()
         );
 
-        eventListener.handleIncidentEvent(event, eventId);
+        eventListener.handleIncidentEvent(event);
 
-        List<Notification> notifications = notificationRepository.findByUserId(assigneeId);
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId);
         assertEquals(1, notifications.size());
-        assertEquals(NotificationStatus.UNREAD, notifications.getFirst().getStatus());
-        assertTrue(processedEventRepository.existsByEventId(eventId));
+        assertEquals(NotificationStatus.SENT, notifications.getFirst().getStatus());
+        assertTrue(processedEventRepository.existsById(incidentId + ":INCIDENT_ASSIGNED"));
     }
 
     @Test
     void duplicateEventIsSkipped() {
-        String eventId = UUID.randomUUID().toString();
         UUID assigneeId = UUID.randomUUID();
 
         Map<String, Object> event = Map.of(
@@ -62,27 +61,26 @@ class NotificationServiceIntegrationTest {
         );
 
         // First call — should create notification
-        eventListener.handleIncidentEvent(event, eventId);
+        eventListener.handleIncidentEvent(event);
 
         // Second call — should skip (idempotent)
-        eventListener.handleIncidentEvent(event, eventId);
+        eventListener.handleIncidentEvent(event);
 
-        List<Notification> notifications = notificationRepository.findByUserId(assigneeId);
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId);
         assertEquals(1, notifications.size(), "Should not create duplicate notification");
     }
 
     @Test
     void eventWithNoTargetsDoesNotPersistAnything() {
-        String eventId = UUID.randomUUID().toString();
-
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_STATUS_CHANGED",
                 "incidentId", UUID.randomUUID().toString()
         );
 
-        eventListener.handleIncidentEvent(event, eventId);
+        eventListener.handleIncidentEvent(event);
 
-        assertFalse(processedEventRepository.existsByEventId(eventId),
+        assertFalse(processedEventRepository.existsById(
+                                event.get("incidentId") + ":INCIDENT_STATUS_CHANGED"),
                 "Should not mark as processed when no notifications created");
     }
 }
