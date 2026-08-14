@@ -18,10 +18,7 @@ management:
   endpoint:
     health:
       show-details: always
-  prometheus:
-    metrics:
-      export:
+  metrics:
+    export:
+      prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: 1.0
