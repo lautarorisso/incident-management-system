@@ -1,14 +1,15 @@
 package com.lautarorisso.user_service;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
-@Disabled("Until persistence adapters (T034) are implemented - JPA repos needed by KeycloakSyncScheduler")
+@ActiveProfiles("test")
 class UserServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
 	}
+
 }

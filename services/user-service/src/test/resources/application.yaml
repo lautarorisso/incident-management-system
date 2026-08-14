@@ -10,10 +10,3 @@ spring:
 eureka:
   client:
     enabled: false
-
-keycloak:
-  admin:
-    server-url: http://localhost:18080
-    realm: test-realm
-    client-id: test-client
-    client-secret: test-secret
