@@ -1,44 +1,21 @@
--- V2: Índices compuestos, parciales y covering para consultas críticas
--- Objetivo: Optimizar las queries reales del ListIncidentsUseCase y OutboxPoller
---
--- Tablas objetivo: incidents, outbox_events
---
--- ÍNDICES A CREAR:
---
--- 1. idx_incidents_status_priority_created
---    Para: WHERE status=? AND priority=? ORDER BY created_at DESC
---    Tipo: Compuesto (btree) - cubre filtro + orden
---    CREATE INDEX CONCURRENTLY idx_incidents_status_priority_created
---        ON incidents (status, priority, created_at DESC);
---
--- 2. idx_incidents_assignee_status (PARCIAL + COVERING)
---    Para: WHERE assignee_id=? AND status=?  (solo assignee_id NOT NULL)
---    Tipo: Parcial (WHERE assignee_id IS NOT NULL) + Covering (INCLUDE id, title)
---    CREATE INDEX CONCURRENTLY idx_incidents_assignee_status
---        ON incidents (assignee_id, status)
---        INCLUDE (id, title)
---        WHERE assignee_id IS NOT NULL;
---
--- 3. idx_incidents_team_status (PARCIAL)
---    Para: WHERE team_id=? AND status=?  (solo team_id NOT NULL)
---    Tipo: Parcial (WHERE team_id IS NOT NULL)
---    CREATE INDEX CONCURRENTLY idx_incidents_team_status
---        ON incidents (team_id, status)
---        WHERE team_id IS NOT NULL;
---
--- 4. idx_outbox_unpublished
---    Para: OutboxPoller.findByPublishedFalse() -> WHERE published=false ORDER BY created_at
---    Tipo: Compuesto
---    CREATE INDEX CONCURRENTLY idx_outbox_unpublished
---        ON outbox_events (published, created_at)
---        WHERE published = false;
---
--- NOTAS IMPORTANTES:
--- - CREATE INDEX CONCURRENTLY NO corre dentro de transacción
---   => Flyway necesita: -- Flyway-disable-transaction  (al inicio del archivo)
--- - IF NOT EXISTS evita error si ya existe (idempotente)
--- - Probar cada uno con: EXPLAIN ANALYZE SELECT ... (ver Index Scan vs Seq Scan)
+-- V2: Índices para las consultas reales del IncidentRepository y OutboxPoller.
+-- Cada índice cubre el WHERE + ORDER BY de una query de la app.
 
--- Flyway-disable-transaction
+-- findByStatusAndPriorityOrderByCreatedAtDesc
+CREATE INDEX IF NOT EXISTS idx_incidents_status_priority_created
+    ON incidents (status, priority, created_at DESC);
 
--- TODO: Escribir aquí los 4 CREATE INDEX CONCURRENTLY ...
+-- findByAssigneeIdAndStatusOrderByCreatedAtDesc / findByAssigneeIdOrderByCreatedAtDesc
+CREATE INDEX IF NOT EXISTS idx_incidents_assignee_status_created
+    ON incidents (assignee_id, status, created_at DESC)
+    WHERE assignee_id IS NOT NULL;
+
+-- findByTeamIdAndStatusOrderByCreatedAtDesc / findByTeamIdOrderByCreatedAtDesc
+CREATE INDEX IF NOT EXISTS idx_incidents_team_status_created
+    ON incidents (team_id, status, created_at DESC)
+    WHERE team_id IS NOT NULL;
+
+-- findByPublishedFalse (OutboxPoller)
+CREATE INDEX IF NOT EXISTS idx_outbox_unpublished
+    ON outbox_events (created_at)
+    WHERE NOT published;

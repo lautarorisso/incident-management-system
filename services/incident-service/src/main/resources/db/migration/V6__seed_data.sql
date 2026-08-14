@@ -1,78 +1,18 @@
--- V6: Datos de prueba realistas (callback afterMigrate)
--- Objetivo: Poblar BD con datos que ejerciten V2-V5 para probar manualmente
--- Se ejecuta AUTOMÁTICAMENTE después de CADA migración (Flyway callback)
--- => Usar ON CONFLICT DO NOTHING para ser idempotente
---
--- DATOS A CREAR:
---
--- 1. 3 Teams
---    INSERT INTO teams (id, name, created_at, updated_at) VALUES
---    (gen_random_uuid(), 'Platform Team', now(), now()),
---    (gen_random_uuid(), 'Backend Team', now(), now()),
---    (gen_random_uuid(), 'Frontend Team', now(), now())
---    ON CONFLICT (id) DO NOTHING;
---
--- 2. 8 Users (distribuidos en teams, algunos sin team)
---    INSERT INTO users (id, username, email, team_id, created_at, updated_at) VALUES
---    (gen_random_uuid(), 'alice', 'alice@company.com', (SELECT id FROM teams WHERE name='Platform Team'), now(), now()),
---    (gen_random_uuid(), 'bob', 'bob@company.com', (SELECT id FROM teams WHERE name='Platform Team'), now(), now()),
---    (gen_random_uuid(), 'carol', 'carol@company.com', (SELECT id FROM teams WHERE name='Backend Team'), now(), now()),
---    (gen_random_uuid(), 'dave', 'dave@company.com', (SELECT id FROM teams WHERE name='Backend Team'), now(), now()),
---    (gen_random_uuid(), 'eve', 'eve@company.com', (SELECT id FROM teams WHERE name='Frontend Team'), now(), now()),
---    (gen_random_uuid(), 'frank', 'frank@company.com', (SELECT id FROM teams WHERE name='Frontend Team'), now(), now()),
---    (gen_random_uuid(), 'grace', 'grace@company.com', NULL, now(), now()),  -- sin team
---    (gen_random_uuid(), 'henry', 'henry@company.com', NULL, now(), now())   -- sin team
---    ON CONFLICT (id) DO NOTHING;
---
--- 3. 50 Incidents (estados variados, prioridades, fechas últimos 90 días)
---    - ~10 OPEN, ~15 IN_PROGRESS, ~15 RESOLVED, ~10 CLOSED
---    - Prioridades distribuidas
---    - ~10 con assignee_id NULL (prueba índice parcial V2)
---    - ~5 con team_id NULL (prueba índice parcial V2)
---    - Fechas: now() - random() * INTERVAL '90 days'
---    - Algunos con SLA breached (creados hace > SLA según prioridad)
---    - Transiciones válidas representadas
---
---    INSERT INTO incidents (id, title, description, status, priority, assignee_id, team_id, created_at, updated_at)
---    SELECT
---        gen_random_uuid(),
---        'Incident ' || gs || ': ' || 
---            CASE WHEN random() < 0.3 THEN 'Database connection timeout'
---                 WHEN random() < 0.5 THEN 'API latency spike'
---                 WHEN random() < 0.7 THEN 'Memory leak in worker'
---                 ELSE 'Authentication failure' END,
---        'Auto-generated test incident for SQL practice',
---        CASE WHEN random() < 0.2 THEN 'OPEN'
---             WHEN random() < 0.5 THEN 'IN_PROGRESS'
---             WHEN random() < 0.8 THEN 'RESOLVED'
---             ELSE 'CLOSED' END,
---        CASE WHEN random() < 0.25 THEN 'LOW'
---             WHEN random() < 0.5 THEN 'MEDIUM'
---             WHEN random() < 0.75 THEN 'HIGH'
---             ELSE 'CRITICAL' END,
---        CASE WHEN random() < 0.2 THEN NULL  -- 20% sin assignee
---             ELSE (SELECT id FROM users ORDER BY random() LIMIT 1) END,
---        CASE WHEN random() < 0.1 THEN NULL  -- 10% sin team
---             ELSE (SELECT id FROM teams ORDER BY random() LIMIT 1) END,
---        now() - (random() * INTERVAL '90 days'),
---        now() - (random() * INTERVAL '30 days')
---    FROM generate_series(1, 50) gs
---    ON CONFLICT (id) DO NOTHING;
---
--- 4. 10 Outbox events pendientes (published=false)
---    INSERT INTO outbox_events (id, event_type, payload, published, created_at)
---    SELECT gen_random_uuid(),
---           CASE WHEN random() < 0.5 THEN 'INCIDENT_CREATED' ELSE 'INCIDENT_TRANSITIONED' END,
---           jsonb_build_object('incidentId', gen_random_uuid(), 'test', true),
---           false,
---           now() - (random() * INTERVAL '7 days')
---    FROM generate_series(1, 10)
---    ON CONFLICT (id) DO NOTHING;
---
--- NOTAS:
--- - ON CONFLICT DO NOTHING requiere PK o UNIQUE constraint en la tabla
---   incidents.id y outbox_events.id son PK -> OK
--- - teams/users pueden no tener PK en name -> usar DO NOTHING en id (gen_random_uuid)
--- - Ejecutar manualmente en psql para probar: \i V6__seed_data.sql
+-- V6: Datos demo idempotentes para pruebas manuales.
+-- Solo incidents: teams y users viven en user_db, no en esta base.
+-- ON CONFLICT (id) DO NOTHING => seguro de re-aplicar.
+-- assignee_id/team_id son UUIDs sintéticos (sin FK local): ejercitan los
+-- índices parciales de V2 y las queries por assignee/team.
 
--- TODO: Escribir aquí los 4 bloques INSERT ...
+INSERT INTO incidents (id, title, description, status, priority, assignee_id, team_id, created_at, updated_at) VALUES
+    ('10000000-0000-0000-0000-000000000001', 'Production API latency spike',          'P99 rising after deploy 4.2.1',             'OPEN',        'CRITICAL', '20000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', now() - INTERVAL '3 hours',  now() - INTERVAL '3 hours'),
+    ('10000000-0000-0000-0000-000000000002', 'Auth provider certificate expiry',      'OIDC certificate expiring in 72h',          'IN_PROGRESS', 'HIGH',     '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000011', now() - INTERVAL '10 hours', now() - INTERVAL '2 hours'),
+    ('10000000-0000-0000-0000-000000000003', 'Broken report download',                'CSV export returns 500 for date range',     'OPEN',        'MEDIUM',   NULL,                                             '20000000-0000-0000-0000-000000000012', now() - INTERVAL '26 hours', now() - INTERVAL '26 hours'),
+    ('10000000-0000-0000-0000-000000000004', 'Logo missing in invoice emails',        'Invoice attachments missing brand assets',  'RESOLVED',    'LOW',      '20000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000013', now() - INTERVAL '4 days',   now() - INTERVAL '2 days'),
+    ('10000000-0000-0000-0000-000000000005', 'Database connection pool exhaustion',   'Connections not returned after timeouts',   'IN_PROGRESS', 'CRITICAL', '20000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000012', now() - INTERVAL '30 hours', now() - INTERVAL '1 hour'),
+    ('10000000-0000-0000-0000-000000000006', 'Stale cache on team dashboard',         'Aggregates not refreshed after reindex',    'OPEN',        'LOW',      NULL,                                             NULL,                                     now() - INTERVAL '5 days',   now() - INTERVAL '5 days'),
+    ('10000000-0000-0000-0000-000000000007', 'Login redirect loop on Safari',         'OAuth callback loops on Safari 18',         'CLOSED',      'MEDIUM',   '20000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000011', now() - INTERVAL '12 days',  now() - INTERVAL '10 days'),
+    ('10000000-0000-0000-0000-000000000008', 'Webhook signature verification',        'HMAC check fails for duplicated deliveries', 'RESOLVED',    'HIGH',     '20000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000013', now() - INTERVAL '6 days',   now() - INTERVAL '5 days'),
+    ('10000000-0000-0000-0000-000000000009', 'Nightly batch job overrun',             'Backup job exceeds maintenance window',     'OPEN',        'MEDIUM',   '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000012', now() - INTERVAL '8 hours',  now() - INTERVAL '8 hours'),
+    ('10000000-0000-0000-0000-000000000010', 'TLS 1.0 still accepted',                'Old clients negotiate deprecated cipher',   'IN_PROGRESS', 'HIGH',     '20000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000011', now() - INTERVAL '2 days',   now() - INTERVAL '20 hours')
+ON CONFLICT (id) DO NOTHING;
