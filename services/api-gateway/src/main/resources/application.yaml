@@ -7,10 +7,6 @@ spring:
   config:
     import: "optional:configserver:http://homelab:8888"
   cloud:
-    # config:
-    #   discovery:
-    #     enabled: true
-    #     service-id: config-server
     gateway:
       server:
         webflux:
@@ -19,11 +15,25 @@ spring:
               uri: http://${DISCOVERY_HOST:localhost}:8761
               predicates: Path=/eureka/web**
               filters: SetPath=/eureka/web
+            - id: incident-service-docs
+              uri: lb://incident-service
+              predicates: Path=/api/incidents/v3/api-docs/**
+              filters:
+                - RewritePath=/api/incidents(?<segment>.*), /$\{segment}
+            - id: notification-service-docs
+              uri: lb://notification-service
+              predicates: Path=/api/notifications/v3/api-docs/**
+              filters:
+                - RewritePath=/api/notifications(?<segment>.*), /$\{segment}
+            - id: user-service-docs
+              uri: lb://user-service
+              predicates: Path=/api/users/v3/api-docs/**
+              filters:
+                - RewritePath=/api/users(?<segment>.*), /$\{segment}
             - id: incident-service
               uri: lb://incident-service
               predicates: Path=/api/incidents/**
               filters:
-                - StripPrefix=2
                 - name: CircuitBreaker
                   args:
                     name: incident-service
@@ -32,7 +42,6 @@ spring:
               uri: lb://notification-service
               predicates: Path=/api/notifications/**
               filters:
-                - StripPrefix=2
                 - name: CircuitBreaker
                   args:
                     name: notification-service
@@ -41,21 +50,15 @@ spring:
               uri: lb://user-service
               predicates: Path=/api/users/**
               filters:
-                - StripPrefix=2
                 - name: CircuitBreaker
                   args:
                     name: user-service
                     fallbackUri: forward:/fallback/users
-    loadbalancer:
-      ribbon:
-        enabled: false
-  # Keycloak excluded for now — JWT validation disabled. Re-enable issuer-uri
-  # when Keycloak is brought back (note: 8081 is now incident-service).
-  # security:
-  #   oauth2:
-  #     resourceserver:
-  #       jwt:
-  #         issuer-uri: http://localhost:8081/realms/ims
+      loadbalancer:
+        ribbon:
+          enabled: false
+  # Auth/JWT is intentionally disabled (SecurityConfig permits all) until
+  # Keycloak is integrated again.
 
 eureka:
   instance:
@@ -68,21 +71,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,tracing
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-  prometheus:
-    metrics:
-      export:
+  metrics:
+    export:
+      prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: 1.0
 
-springdoc:
-  api-docs:
-    enabled: true
+app:
+  rate-limit:
+    limit-for-period: 10
+    refresh-period: 5s
 
 scalar:
   enabled: true
@@ -110,8 +111,6 @@ resilience4j:
         waitDurationInOpenState: 30s
         failureRateThreshold: 50
     instances:
-      api-gateway:
-        baseConfig: default
       incident-service:
         baseConfig: default
       notification-service:
