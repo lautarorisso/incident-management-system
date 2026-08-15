@@ -6,10 +6,6 @@ spring:
     name: notification-service
   config:
     import: "optional:configserver:http://homelab:8888"
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/notification_db
     username: ${POSTGRES_USER:postgres}
@@ -17,7 +13,6 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
   rabbitmq:
     host: localhost
     port: 5672

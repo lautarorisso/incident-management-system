@@ -1,13 +1,6 @@
 # Test configuration for Incident Service
-# Disables OAuth2 Resource Server auto-configuration for tests
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: "http://localhost:9999"  # dummy URI
-
 # Disable Config Server import for tests
+spring:
   config:
     import: "optional:configserver:"
 

@@ -54,9 +54,6 @@ spring:
                   args:
                     name: user-service
                     fallbackUri: forward:/fallback/users
-      loadbalancer:
-        ribbon:
-          enabled: false
   # Auth/JWT is intentionally disabled (SecurityConfig permits all) until
   # Keycloak is integrated again.
 
