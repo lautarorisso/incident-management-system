@@ -7,10 +7,6 @@ spring:
   config:
     import: "optional:configserver:http://homelab:8888"
   cloud:
-    # config:
-    #   discovery:
-    #     enabled: true
-    #     service-id: config-server
     loadbalancer:
       ribbon:
         enabled: false
@@ -41,6 +37,9 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
 
 notification:
   email:
@@ -58,7 +57,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,tracing
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -66,29 +65,3 @@ management:
     export:
       prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: 1.0
-
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 30s
-        failureRateThreshold: 50
-    instances:
-      notification-service:
-        baseConfig: default
-
-  cloud:
-    loadbalancer:
-      ribbon:
-        enabled: false
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false

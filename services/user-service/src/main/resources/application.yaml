@@ -7,10 +7,6 @@ spring:
   config:
     import: "optional:configserver:http://homelab:8888"
   cloud:
-    # config:
-    #   discovery:
-    #     enabled: true
-    #     service-id: config-server
     loadbalancer:
       ribbon:
         enabled: false
@@ -34,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,tracing
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -42,30 +38,3 @@ management:
     export:
       prometheus:
         enabled: true
-  tracing:
-    sampling:
-      probability: 1.0
-
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 30s
-        failureRateThreshold: 50
-    instances:
-      user-service:
-        baseConfig: default
-
-# Keycloak excluded for now — block kept because KeycloakConfig bean requires
-# these properties at startup. Placeholder port (no service listens on 18080).
-keycloak:
-  admin:
-    server-url: http://localhost:18080
-    realm: master
-    client-id: admin-cli
-    client-secret: ${KEYCLOAK_CLIENT_SECRET:changeme}
