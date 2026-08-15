@@ -68,6 +68,7 @@ class OutboxPollerTest {
         verify(eventPublisher).publish(eventTypeCaptor.capture(), eventDataCaptor.capture());
         assertThat(eventTypeCaptor.getValue()).isEqualTo(IncidentEvent.INCIDENT_CREATED);
         assertThat(eventDataCaptor.getValue()).containsEntry("incidentId", incidentId.toString());
+        assertThat(eventDataCaptor.getValue()).containsEntry("eventId", event.getId().toString());
         assertThat(event.isPublished()).isTrue();
         verify(outboxEventRepository).save(event);
     }
@@ -126,6 +127,7 @@ class OutboxPollerTest {
         );
         assertThat(eventTypeCaptor.getValue()).isEqualTo(IncidentEvent.INCIDENT_STATUS_CHANGED);
         assertThat(eventDataCaptor.getValue()).containsEntry("incidentId", incidentId.toString());
+        assertThat(eventDataCaptor.getValue()).containsEntry("eventId", event.getId().toString());
     }
 
     @Test

@@ -24,7 +24,7 @@ public class RabbitMqEventPublisher {
      * Publishes an incident event to RabbitMQ.
      *
      * @param eventType the type of domain event
-     * @param eventData the event payload as a map (incidentId, assigneeId, teamId, priority, status, title)
+     * @param eventData the event payload as a map (eventId, incidentId, assigneeId, teamId, priority, status, title)
      */
     public void publish(IncidentEvent eventType, Map<String, Object> eventData) {
         eventData.put("eventType", eventType.name());

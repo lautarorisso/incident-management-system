@@ -48,10 +48,13 @@ public class IncidentEventListener {
     public void handleIncidentEvent(Map<String, Object> event) {
         String incidentId = (String) event.get("incidentId");
         String eventType = (String) event.get("eventType");
-        // Stable idempotency key derived from the payload: the publisher does not
-        // provide a message id, and the broker delivery tag is not stable across
-        // redeliveries. (incidentId + eventType) is unique per domain event.
-        String eventId = incidentId + ":" + eventType;
+        // Stable idempotency key: the outbox publisher stamps each event with a
+        // unique eventId. The fallback (incidentId + eventType) only applies to
+        // legacy events published before that field existed; two status changes of
+        // the same incident must NOT share a key, or the second one is dropped.
+        String eventId = event.get("eventId") != null
+                ? event.get("eventId").toString()
+                : incidentId + ":" + eventType;
         log.debug("Received incident event: {} (id={})", eventType, eventId);
 
         // Idempotency check — skip if already processed

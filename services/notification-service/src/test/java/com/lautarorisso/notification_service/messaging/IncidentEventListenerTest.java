@@ -58,9 +58,10 @@ class IncidentEventListenerTest {
     void handlesNewEventAndCreatesNotifications() {
         UUID assigneeId = UUID.randomUUID();
         String incidentId = UUID.randomUUID().toString();
-        String eventId = eventIdFor(incidentId, "INCIDENT_ASSIGNED");
+        String eventId = UUID.randomUUID().toString();
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
                 "incidentId", incidentId,
                 "assigneeId", assigneeId.toString(),
                 "changedBy", UUID.randomUUID().toString()
@@ -87,6 +88,7 @@ class IncidentEventListenerTest {
     @Test
     void skipsAlreadyProcessedEvent() {
         String incidentId = UUID.randomUUID().toString();
+        // Legacy event without eventId: falls back to (incidentId + eventType)
         when(processedEventRepository.existsById(eventIdFor(incidentId, "INCIDENT_ASSIGNED")))
                 .thenReturn(true);
 
@@ -100,13 +102,14 @@ class IncidentEventListenerTest {
 
     @Test
     void skipsWhenNoTargetsResolved() {
+        String eventId = UUID.randomUUID().toString();
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_STATUS_CHANGED",
+                "eventId", eventId,
                 "incidentId", UUID.randomUUID().toString()
         );
 
-        when(processedEventRepository.existsById(eventIdFor(
-                (String) event.get("incidentId"), "INCIDENT_STATUS_CHANGED"))).thenReturn(false);
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
         when(routingService.resolveNotificationType("INCIDENT_STATUS_CHANGED"))
                 .thenReturn(NotificationType.INCIDENT_STATUS_CHANGED);
         when(routingService.resolveTargets(event)).thenReturn(Set.of());
@@ -121,14 +124,15 @@ class IncidentEventListenerTest {
     void createsNotificationsForMultipleTargets() {
         UUID user1 = UUID.randomUUID();
         UUID user2 = UUID.randomUUID();
+        String eventId = UUID.randomUUID().toString();
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
                 "incidentId", UUID.randomUUID().toString(),
                 "assigneeId", user1.toString()
         );
 
-        when(processedEventRepository.existsById(eventIdFor(
-                (String) event.get("incidentId"), "INCIDENT_ASSIGNED"))).thenReturn(false);
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
         when(routingService.resolveTargets(event)).thenReturn(Set.of(user1, user2));
         when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
                 .thenReturn(NotificationType.INCIDENT_ASSIGNED);
@@ -145,13 +149,14 @@ class IncidentEventListenerTest {
 
     @Test
     void handlesUnknownNotificationTypeBySkipping() {
+        String eventId = UUID.randomUUID().toString();
         Map<String, Object> event = Map.of(
                 "eventType", "UNKNOWN_EVENT",
+                "eventId", eventId,
                 "incidentId", UUID.randomUUID().toString()
         );
 
-        when(processedEventRepository.existsById(eventIdFor(
-                (String) event.get("incidentId"), "UNKNOWN_EVENT"))).thenReturn(false);
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
         when(routingService.resolveNotificationType("UNKNOWN_EVENT")).thenReturn(null);
 
         listener.handleIncidentEvent(event);
@@ -164,14 +169,15 @@ class IncidentEventListenerTest {
     void handlesMalformedIncidentIdWithoutCrashing() {
         UUID assigneeId = UUID.randomUUID();
         String incidentId = "not-a-uuid";
+        String eventId = UUID.randomUUID().toString();
         Map<String, Object> event = Map.of(
                 "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
                 "incidentId", incidentId,
                 "assigneeId", assigneeId.toString()
         );
 
-        when(processedEventRepository.existsById(eventIdFor(incidentId, "INCIDENT_ASSIGNED")))
-                .thenReturn(false);
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
         when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
         when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
                 .thenReturn(NotificationType.INCIDENT_ASSIGNED);
@@ -186,5 +192,45 @@ class IncidentEventListenerTest {
                  n.getUserId().equals(assigneeId) &&
                  n.getType() == NotificationType.INCIDENT_ASSIGNED
         ));
+    }
+
+    @Test
+    void twoStatusChangesOfSameIncidentAreNotDedupedWhenEventIdsDiffer() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String firstEventId = UUID.randomUUID().toString();
+        String secondEventId = UUID.randomUUID().toString();
+
+        Map<String, Object> firstChange = Map.of(
+                "eventType", "INCIDENT_STATUS_CHANGED",
+                "eventId", firstEventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+        Map<String, Object> secondChange = Map.of(
+                "eventType", "INCIDENT_STATUS_CHANGED",
+                "eventId", secondEventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(firstEventId)).thenReturn(false);
+        when(processedEventRepository.existsById(secondEventId)).thenReturn(false);
+        when(routingService.resolveTargets(firstChange)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveTargets(secondChange)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_STATUS_CHANGED"))
+                .thenReturn(NotificationType.INCIDENT_STATUS_CHANGED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_STATUS_CHANGED))
+                .thenReturn("Incident status has changed");
+
+        listener.handleIncidentEvent(firstChange);
+        listener.handleIncidentEvent(secondChange);
+
+        // 2 notifications per event (UNREAD + SENT), never deduped away
+        verify(notificationRepository, times(4)).save(any());
+        verify(processedEventRepository).save(argThat(p ->
+                p.getEventId().equals(firstEventId)));
+        verify(processedEventRepository).save(argThat(p ->
+                p.getEventId().equals(secondEventId)));
     }
 }

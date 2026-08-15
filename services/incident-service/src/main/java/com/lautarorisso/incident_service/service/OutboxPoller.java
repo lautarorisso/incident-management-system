@@ -50,6 +50,10 @@ public class OutboxPoller {
                 IncidentEvent eventType = IncidentEvent.valueOf(event.getEventType());
                 Map<String, Object> eventData = objectMapper.readValue(
                         event.getPayload(), new TypeReference<LinkedHashMap<String, Object>>() {});
+                // Stamp a unique event id so consumers can dedupe on it instead of
+                // (incidentId + eventType), which collides for repeated events of
+                // the same incident.
+                eventData.put("eventId", event.getId().toString());
 
                 eventPublisher.publish(eventType, eventData);
 
