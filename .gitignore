@@ -23,6 +23,9 @@ Thumbs.db
 # Environment
 .env
 
+# Local machine-specific deployment files
+docker-compose.homelab.yml
+
 # Package files
 *.jar
 *.war
