@@ -41,9 +41,9 @@ FAILED=0
 SKIPPED=0
 
 # ---- Helpers ----------------------------------------------------------------
-pass()   { echo -e "  ${PASS} $1"; ((PASSED++)); }
-fail()   { echo -e "  ${FAIL} $1"; ((FAILED++)); }
-skip()   { echo -e "  ${SKIP} $1"; ((SKIPPED++)); }
+pass()   { echo -e "  ${PASS} $1"; PASSED=$((PASSED + 1)); }
+fail()   { echo -e "  ${FAIL} $1"; FAILED=$((FAILED + 1)); }
+skip()   { echo -e "  ${SKIP} $1"; SKIPPED=$((SKIPPED + 1)); }
 info()   { echo -e "  ${YELLOW}→${NC} $1"; }
 
 check_jq() {
@@ -178,8 +178,8 @@ main() {
 
     info "GET /api/notifications"
     local notif_response
-    notif_response=$(curl -sf "${NOTIFICATION_URL}/api/notifications" 2>&1) || {
-        notif_response=$(curl -sf "${GATEWAY_URL}/api/notifications" 2>&1) || {
+    notif_response=$(curl -sf "${NOTIFICATION_URL}/api/notifications?userId=00000000-0000-0000-0000-000000000000" 2>&1) || {
+        notif_response=$(curl -sf "${GATEWAY_URL}/api/notifications?userId=00000000-0000-0000-0000-000000000000" 2>&1) || {
             skip "Notifications endpoint unavailable (may need incident event to propagate)"
         }
     }
@@ -210,7 +210,7 @@ main() {
         if curl -sf "${GATEWAY_URL}/api/users" -o /dev/null 2>&1; then
             pass "User service listing available (via gateway)"
         else
-            skip "User listing endpoint (requires Keycloak sync)"
+            skip "User listing endpoint unavailable"
         fi
     fi
 
