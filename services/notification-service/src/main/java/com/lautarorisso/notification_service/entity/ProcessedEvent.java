@@ -1,26 +1,23 @@
 package com.lautarorisso.notification_service.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
 /**
- * JPA entity mapping the processed_events table for idempotency tracking.
+ * MongoDB document mapping the processed_events collection for idempotency tracking.
  * <p>
  * Stores the unique event ID from RabbitMQ messages so that duplicate
  * deliveries can be detected and ignored.
  */
-@Entity
-@Table(name = "processed_events")
+@Document(collection = "processed_events")
 @Getter
 @ToString
 @EqualsAndHashCode
@@ -30,9 +27,7 @@ import java.time.Instant;
 public class ProcessedEvent {
 
     @Id
-    @Column(name = "event_id")
     private String eventId;
 
-    @Column(name = "processed_at", nullable = false)
     private Instant processedAt;
 }

@@ -1,10 +1,10 @@
 package com.lautarorisso.notification_service.repository;
 
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 /**
- * Spring Data repository for {@link ProcessedEvent} entities.
+ * Spring Data repository for {@link ProcessedEvent} documents.
  */
-public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, String> {
+public interface ProcessedEventRepository extends MongoRepository<ProcessedEvent, String> {
 }

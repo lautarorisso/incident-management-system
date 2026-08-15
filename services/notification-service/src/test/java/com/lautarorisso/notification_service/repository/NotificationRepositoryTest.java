@@ -4,9 +4,10 @@ import com.lautarorisso.notification_service.entity.Notification;
 import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.entity.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
@@ -16,7 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DataJpaTest
+@DataMongoTest
 @ActiveProfiles("test")
 class NotificationRepositoryTest {
 
@@ -25,6 +26,12 @@ class NotificationRepositoryTest {
 
     @Autowired
     private ProcessedEventRepository processedEventRepository;
+
+    @BeforeEach
+    void cleanCollections() {
+        notificationRepository.deleteAll();
+        processedEventRepository.deleteAll();
+    }
 
     // --- Notification Repository Tests ---
 

@@ -10,13 +10,9 @@ spring:
     config:
       discovery:
         enabled: true
-  datasource:
-    url: jdbc:postgresql://localhost:5432/notification_db
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:postgres}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/notification_db
   rabbitmq:
     host: localhost
     port: 5672
