@@ -25,11 +25,13 @@ CREATE TABLE IF NOT EXISTS teams (
     CONSTRAINT uk_teams_name UNIQUE (name)
 );
 
--- Join table generada por @ElementCollection List<UUID> teamIds en User.
-CREATE TABLE IF NOT EXISTS users_team_ids (
-    users_id UUID NOT NULL,
-    team_id  UUID NOT NULL,
-    CONSTRAINT pk_users_team_ids PRIMARY KEY (users_id, team_id),
-    CONSTRAINT fk_users_team_ids_users FOREIGN KEY (users_id) REFERENCES users (id),
-    CONSTRAINT fk_users_team_ids_teams FOREIGN KEY (team_id) REFERENCES teams (id)
+-- Join table del @ElementCollection List<UUID> teamIds en User.
+-- Nombres explícitos en la entidad (@CollectionTable/@JoinColumn), que es el
+-- contrato que ddl-auto=validate verifica contra este esquema.
+CREATE TABLE IF NOT EXISTS user_team_ids (
+    user_id UUID NOT NULL,
+    team_id UUID NOT NULL,
+    CONSTRAINT pk_user_team_ids PRIMARY KEY (user_id, team_id),
+    CONSTRAINT fk_user_team_ids_users FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_user_team_ids_teams FOREIGN KEY (team_id) REFERENCES teams (id)
 );
