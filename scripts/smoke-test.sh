@@ -3,14 +3,15 @@
 # Incident Management System — Smoke Test
 # =============================================================================
 # End-to-end smoke test: health checks all services, creates an incident,
-# assigns it, transitions it, and verifies a notification is created.
+# assigns it to a real user, transitions it, and verifies the notification
+# pipeline (outbox → RabbitMQ → notification-service) delivers a notification.
 #
 # Usage:
 #   ./scripts/smoke-test.sh              # default (local ports)
 #   GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 #
 # Prerequisites:
-#   curl, jq
+#   curl, jq (recommended)
 #   All services running (or `docker-compose up -d --build`)
 # =============================================================================
 
@@ -39,12 +40,19 @@ SKIP="${YELLOW}−${NC}"
 PASSED=0
 FAILED=0
 SKIPPED=0
+HAS_JQ=false
 
 # ---- Helpers ----------------------------------------------------------------
 pass()   { echo -e "  ${PASS} $1"; PASSED=$((PASSED + 1)); }
 fail()   { echo -e "  ${FAIL} $1"; FAILED=$((FAILED + 1)); }
 skip()   { echo -e "  ${SKIP} $1"; SKIPPED=$((SKIPPED + 1)); }
 info()   { echo -e "  ${YELLOW}→${NC} $1"; }
+
+# Extracts the last UUID in a JSON document (no jq fallback).
+# With jq prefer `jq -r '.[0].id'` instead; this is only for degraded mode.
+extract_uuid() {
+    sed -n 's/.*"\([0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}\)".*/\1/p' | head -1
+}
 
 check_jq() {
     if ! command -v jq &>/dev/null; then
@@ -80,10 +88,43 @@ wait_for_service() {
     return 1
 }
 
+# Polls the notifications endpoint until at least one notification exists
+# for the given user. Proves the full pipeline: incident event → outbox →
+# RabbitMQ → notification-service.
+wait_for_notification() {
+    local user_id="$1"
+    local max_attempts=$((TIMEOUT_SEC / POLL_INTERVAL))
+    local attempt=0
+
+    info "Polling notifications for user ${user_id} ..."
+    while [ $attempt -lt "$max_attempts" ]; do
+        local response
+        response=$(curl -sf "${GATEWAY_URL}/api/notifications?userId=${user_id}" 2>&1) || response=""
+
+        if [ -n "$response" ]; then
+            if [ "$HAS_JQ" = true ]; then
+                local count
+                count=$(echo "$response" | jq '. | length')
+                if [ "${count:-0}" -gt 0 ]; then
+                    pass "Notification pipeline OK — ${count} notification(s) for user ${user_id}"
+                    return 0
+                fi
+            elif [ -n "$(echo "$response" | extract_uuid)" ]; then
+                pass "Notification pipeline OK — notification received for user ${user_id}"
+                return 0
+            fi
+        fi
+
+        attempt=$((attempt + 1))
+        sleep "$POLL_INTERVAL"
+    done
+    fail "No notification received for user ${user_id} within ${TIMEOUT_SEC}s"
+    return 1
+}
+
 # ---- Main -------------------------------------------------------------------
 main() {
-    local has_jq=false
-    check_jq && has_jq=true
+    check_jq && HAS_JQ=true
     check_curl
 
     echo ""
@@ -110,8 +151,7 @@ main() {
     local create_payload='{
         "title": "Smoke Test Incident",
         "description": "Created by smoke-test.sh",
-        "priority": "HIGH",
-        "reporterId": "smoke-test-user"
+        "priority": "HIGH"
     }'
 
     info "POST /api/incidents"
@@ -128,10 +168,10 @@ main() {
         }
     }
 
-    if $has_jq; then
+    if [ "$HAS_JQ" = true ]; then
         incident_id=$(echo "$create_response" | jq -r '.id // empty')
     else
-        incident_id=$(echo "$create_response" | grep -oP '"id"\s*:\s*"\K[^"]+' | head -1)
+        incident_id=$(echo "$create_response" | extract_uuid)
     fi
 
     if [ -n "$incident_id" ]; then
@@ -172,43 +212,75 @@ main() {
         fi
     fi
 
-    # ---- Phase 5: Check Notifications --------------------------------------
+    # ---- Phase 5: Real Notification Pipeline -------------------------------
     echo ""
-    echo "── Phase 5: Verify Notification ────────────────────────────────────"
+    echo "── Phase 5: Verify Notification Pipeline ───────────────────────────"
 
-    info "GET /api/notifications"
-    local notif_response
-    notif_response=$(curl -sf "${NOTIFICATION_URL}/api/notifications?userId=00000000-0000-0000-0000-000000000000" 2>&1) || {
-        notif_response=$(curl -sf "${GATEWAY_URL}/api/notifications?userId=00000000-0000-0000-0000-000000000000" 2>&1) || {
-            skip "Notifications endpoint unavailable (may need incident event to propagate)"
+    info "GET /api/users"
+    local users_response
+    users_response=$(curl -sf "${GATEWAY_URL}/api/users" 2>&1) || {
+        users_response=$(curl -sf "${USER_URL}/api/users" 2>&1) || {
+            users_response=""
         }
     }
 
-    if [ -n "${notif_response:-}" ]; then
-        if $has_jq; then
-            local notif_count
-            notif_count=$(echo "$notif_response" | jq '. | length')
-            if [ "$notif_count" -gt 0 ]; then
-                pass "Found ${notif_count} notification(s)"
-            else
-                skip "No notifications yet (event may still be processing)"
-            fi
+    local assignee_id=""
+    if [ -n "$users_response" ]; then
+        if [ "$HAS_JQ" = true ]; then
+            assignee_id=$(echo "$users_response" | jq -r '.[0].id // empty' 2>/dev/null)
         else
-            # jq not available — just check response is non-empty
-            pass "Notification endpoint responded"
+            assignee_id=$(echo "$users_response" | extract_uuid)
         fi
     fi
 
-    # ---- Phase 6: User Service Health -------------------------------------
+    if [ -z "$assignee_id" ]; then
+        skip "No users available in user-service — cannot validate notification pipeline"
+    else
+        pass "Resolved assignee user ${assignee_id}"
+
+        info "PUT /api/incidents/${incident_id}/assign"
+        if curl -sf -X PUT "${GATEWAY_URL}/api/incidents/${incident_id}/assign" \
+                -H "Content-Type: application/json" \
+                -d "{\"assigneeId\":\"${assignee_id}\"}" -o /dev/null 2>&1; then
+            pass "Incident assigned to ${assignee_id}"
+        else
+            if curl -sf -X PUT "${INCIDENT_URL}/api/incidents/${incident_id}/assign" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"assigneeId\":\"${assignee_id}\"}" -o /dev/null 2>&1; then
+                pass "Incident assigned to ${assignee_id} (direct)"
+            else
+                fail "Failed to assign incident ${incident_id}"
+            fi
+        fi
+
+        info "PUT /api/incidents/${incident_id}/transition → IN_PROGRESS"
+        if curl -sf -X PUT "${GATEWAY_URL}/api/incidents/${incident_id}/transition" \
+                -H "Content-Type: application/json" \
+                -d '{"newStatus":"IN_PROGRESS"}' -o /dev/null 2>&1; then
+            pass "Incident transitioned to IN_PROGRESS"
+        else
+            if curl -sf -X PUT "${INCIDENT_URL}/api/incidents/${incident_id}/transition" \
+                    -H "Content-Type: application/json" \
+                    -d '{"newStatus":"IN_PROGRESS"}' -o /dev/null 2>&1; then
+                pass "Incident transitioned to IN_PROGRESS (direct)"
+            else
+                fail "Failed to transition incident ${incident_id}"
+            fi
+        fi
+
+        wait_for_notification "$assignee_id"
+    fi
+
+    # ---- Phase 6: User Service Listing ------------------------------------
     echo ""
-    echo "── Phase 6: User Service ───────────────────────────────────────────"
+    echo "── Phase 6: User Service Listing ───────────────────────────────────"
 
     info "GET /api/users"
-    if curl -sf "${USER_URL}/api/users" -o /dev/null 2>&1; then
+    if curl -sf "${GATEWAY_URL}/api/users" -o /dev/null 2>&1; then
         pass "User service listing available"
     else
-        if curl -sf "${GATEWAY_URL}/api/users" -o /dev/null 2>&1; then
-            pass "User service listing available (via gateway)"
+        if curl -sf "${USER_URL}/api/users" -o /dev/null 2>&1; then
+            pass "User service listing available (direct)"
         else
             skip "User listing endpoint unavailable"
         fi
