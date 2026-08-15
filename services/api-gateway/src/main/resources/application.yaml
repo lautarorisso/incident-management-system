@@ -5,8 +5,11 @@ spring:
   application:
     name: api-gateway
   config:
-    import: "optional:configserver:http://homelab:8888"
+    import: "optional:configserver:"
   cloud:
+    config:
+      discovery:
+        enabled: true
     gateway:
       server:
         webflux:

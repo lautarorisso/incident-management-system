@@ -5,7 +5,11 @@ spring:
   application:
     name: notification-service
   config:
-    import: "optional:configserver:http://homelab:8888"
+    import: "optional:configserver:"
+  cloud:
+    config:
+      discovery:
+        enabled: true
   datasource:
     url: jdbc:postgresql://localhost:5432/notification_db
     username: ${POSTGRES_USER:postgres}
