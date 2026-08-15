@@ -4,6 +4,7 @@ import com.ims.shared.dto.TeamDto;
 import com.ims.shared.dto.UserDto;
 import com.lautarorisso.user_service.entity.Team;
 import com.lautarorisso.user_service.entity.User;
+import com.lautarorisso.user_service.exception.ResourceNotFoundException;
 import com.lautarorisso.user_service.service.TeamService;
 import com.lautarorisso.user_service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,7 +47,7 @@ public class UserController {
     public ResponseEntity<UserDto> getUserById(@PathVariable UUID id) {
         return userService.getUserById(id)
                 .map(user -> ResponseEntity.ok(toUserResponse(user)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
     }
 
     @GetMapping("/users")
@@ -71,7 +72,7 @@ public class UserController {
     public ResponseEntity<TeamDto> getTeamById(@PathVariable UUID id) {
         return teamService.getTeamById(id)
                 .map(team -> ResponseEntity.ok(toTeamResponse(team)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + id));
     }
 
     // --- Manual mapping helpers (no MapStruct) ---

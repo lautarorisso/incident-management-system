@@ -1,6 +1,5 @@
-package com.lautarorisso.incident_service.controller;
+package com.lautarorisso.incident_service.exception;
 
-import com.lautarorisso.incident_service.NotFoundException;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

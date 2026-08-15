@@ -263,7 +263,7 @@ class IncidentControllerTest {
     @Test
     void shouldReturn404WhenNotFoundExceptionThrown() throws Exception {
         when(incidentService.getIncident(incidentUuid))
-                .thenThrow(new com.lautarorisso.incident_service.NotFoundException("Incident not found: " + incidentUuid));
+                .thenThrow(new com.lautarorisso.incident_service.exception.NotFoundException("Incident not found: " + incidentUuid));
 
         mockMvc.perform(get("/api/incidents/{id}", incidentUuid))
                 .andExpect(status().isNotFound());

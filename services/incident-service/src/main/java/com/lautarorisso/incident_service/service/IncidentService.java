@@ -3,7 +3,7 @@ package com.lautarorisso.incident_service.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.lautarorisso.incident_service.NotFoundException;
+import com.lautarorisso.incident_service.exception.NotFoundException;
 import com.lautarorisso.incident_service.entity.Incident;
 import com.lautarorisso.incident_service.entity.IncidentEvent;
 import com.lautarorisso.incident_service.entity.IncidentPriority;

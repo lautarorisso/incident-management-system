@@ -1,7 +1,7 @@
 package com.lautarorisso.incident_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lautarorisso.incident_service.NotFoundException;
+import com.lautarorisso.incident_service.exception.NotFoundException;
 import com.lautarorisso.incident_service.client.UserServiceClient;
 import com.lautarorisso.incident_service.entity.Incident;
 import com.lautarorisso.incident_service.entity.IncidentEvent;
