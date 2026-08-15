@@ -34,7 +34,7 @@ class OutboxPollerTest {
     private OutboxEventRepository outboxEventRepository;
 
     @Mock
-    private OutboxPollerEventForwarder forwarder;
+    private RabbitMqEventPublisher eventPublisher;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,7 +48,7 @@ class OutboxPollerTest {
 
     @BeforeEach
     void setUp() {
-        poller = new OutboxPoller(outboxEventRepository, forwarder, objectMapper);
+        poller = new OutboxPoller(outboxEventRepository, eventPublisher, objectMapper);
     }
 
     @Test
@@ -65,7 +65,7 @@ class OutboxPollerTest {
 
         poller.processOutbox();
 
-        verify(forwarder).publish(eventTypeCaptor.capture(), eventDataCaptor.capture());
+        verify(eventPublisher).publish(eventTypeCaptor.capture(), eventDataCaptor.capture());
         assertThat(eventTypeCaptor.getValue()).isEqualTo(IncidentEvent.INCIDENT_CREATED);
         assertThat(eventDataCaptor.getValue()).containsEntry("incidentId", incidentId.toString());
         assertThat(event.isPublished()).isTrue();
@@ -92,7 +92,7 @@ class OutboxPollerTest {
 
         poller.processOutbox();
 
-        verify(forwarder, times(2)).publish(any(), any());
+        verify(eventPublisher, times(2)).publish(any(), any());
         verify(outboxEventRepository, times(2)).save(any());
     }
 
@@ -102,7 +102,7 @@ class OutboxPollerTest {
 
         poller.processOutbox();
 
-        verify(forwarder, never()).publish(any(), any());
+        verify(eventPublisher, never()).publish(any(), any());
         verify(outboxEventRepository, never()).save(any());
     }
 
@@ -120,7 +120,7 @@ class OutboxPollerTest {
 
         poller.processOutbox();
 
-        verify(forwarder).publish(
+        verify(eventPublisher).publish(
                 eventTypeCaptor.capture(),
                 eventDataCaptor.capture()
         );
@@ -153,7 +153,7 @@ class OutboxPollerTest {
 
         poller.processOutbox();
 
-        verify(forwarder).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
+        verify(eventPublisher).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
         verify(outboxEventRepository, never()).save(badEvent);
         verify(outboxEventRepository).save(goodEvent);
     }

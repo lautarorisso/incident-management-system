@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lautarorisso.incident_service.entity.IncidentEvent;
 import com.lautarorisso.incident_service.entity.OutboxEvent;
-import com.lautarorisso.incident_service.messaging.OutboxPollerEventForwarder;
+import com.lautarorisso.incident_service.messaging.RabbitMqEventPublisher;
 import com.lautarorisso.incident_service.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * Scheduled poller that reads unpublished outbox events, publishes them
- * to RabbitMQ via the {@link OutboxPollerEventForwarder}, and marks them as published.
+ * to RabbitMQ via the {@link RabbitMqEventPublisher}, and marks them as published.
  * <p>
  * Implements the transactional outbox pattern for reliable event delivery.
  */
@@ -28,7 +28,7 @@ import java.util.Map;
 public class OutboxPoller {
 
     private final OutboxEventRepository outboxEventRepository;
-    private final OutboxPollerEventForwarder forwarder;
+    private final RabbitMqEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
     /**
@@ -51,7 +51,7 @@ public class OutboxPoller {
                 Map<String, Object> eventData = objectMapper.readValue(
                         event.getPayload(), new TypeReference<LinkedHashMap<String, Object>>() {});
 
-                forwarder.publish(eventType, eventData);
+                eventPublisher.publish(eventType, eventData);
 
                 event.setPublished(true);
                 outboxEventRepository.save(event);

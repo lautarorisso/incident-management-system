@@ -3,7 +3,7 @@ package com.lautarorisso.notification_service.messaging;
 import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.entity.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
-import com.lautarorisso.notification_service.notifier.NotificationSender;
+import com.lautarorisso.notification_service.notifier.EmailNotificationSender;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
 import com.lautarorisso.notification_service.service.NotificationRoutingService;
@@ -37,7 +37,7 @@ class IncidentEventListenerTest {
     private NotificationRoutingService routingService;
 
     @Mock
-    private NotificationSender notificationSender;
+    private EmailNotificationSender notificationSender;
 
     private IncidentEventListener listener;
 

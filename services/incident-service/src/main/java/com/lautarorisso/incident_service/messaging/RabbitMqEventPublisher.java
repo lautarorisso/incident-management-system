@@ -9,14 +9,14 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * RabbitMQ implementation of the {@link OutboxPollerEventForwarder}.
+ * Publishes outbox events to RabbitMQ.
  * <p>
  * Converts outbox event payloads to messages and publishes them
  * to the "incident.events" exchange.
  */
 @Component
 @RequiredArgsConstructor
-public class RabbitMqEventPublisher implements OutboxPollerEventForwarder {
+public class RabbitMqEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
 
@@ -26,7 +26,6 @@ public class RabbitMqEventPublisher implements OutboxPollerEventForwarder {
      * @param eventType the type of domain event
      * @param eventData the event payload as a map (incidentId, assigneeId, teamId, priority, status, title)
      */
-    @Override
     public void publish(IncidentEvent eventType, Map<String, Object> eventData) {
         eventData.put("eventType", eventType.name());
         eventData.put("timestamp", Instant.now().toString());

@@ -4,7 +4,7 @@ import com.lautarorisso.notification_service.entity.Notification;
 import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.entity.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
-import com.lautarorisso.notification_service.notifier.NotificationSender;
+import com.lautarorisso.notification_service.notifier.EmailNotificationSender;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
 import com.lautarorisso.notification_service.service.NotificationRoutingService;
@@ -36,7 +36,7 @@ public class IncidentEventListener {
     private final ProcessedEventRepository processedEventRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationRoutingService routingService;
-    private final NotificationSender notificationSender;
+    private final EmailNotificationSender notificationSender;
 
     /**
      * Handles an incoming incident event from RabbitMQ.

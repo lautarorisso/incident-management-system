@@ -15,7 +15,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class EmailNotificationSender implements NotificationSender {
+public class EmailNotificationSender {
 
     private final JavaMailSender mailSender;
 
@@ -25,7 +25,6 @@ public class EmailNotificationSender implements NotificationSender {
     @Value("${notification.email.enabled:true}")
     private boolean emailEnabled;
 
-    @Override
     public void send(Notification notification) {
         if (!emailEnabled) {
             log.info("Email sending disabled, logging notification instead: {}", notification.getId());
