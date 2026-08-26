@@ -1,0 +1,43 @@
+.git
+target
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IDE
+.idea
+.vscode
+*.iml
+.project
+.classpath
+.settings
+
+# Environment & secrets
+.env
+.env.*
+
+# Docker (not needed inside build context)
+.dockerignore
+docker-compose*.yml
+
+# Scripts & docs
+scripts
+README.md
+*.md
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# JVM
+hs_err_pid*
+replay_pid*
+
+# AI runtime
+.atl

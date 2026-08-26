@@ -1,0 +1,75 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: discovery-service
+              uri: http://${DISCOVERY_HOST:discovery-service}:8761
+              predicates: Path=/eureka/web**
+              filters: SetPath=/eureka/web
+            - id: incident-service-docs
+              uri: lb://incident-service
+              predicates: Path=/api/incidents/v3/api-docs/**
+              filters:
+                - RewritePath=/api/incidents(?<segment>.*), /${segment}
+            - id: notification-service-docs
+              uri: lb://notification-service
+              predicates: Path=/api/notifications/v3/api-docs/**
+              filters:
+                - RewritePath=/api/notifications(?<segment>.*), /${segment}
+            - id: user-service-docs
+              uri: lb://user-service
+              predicates: Path=/api/users/v3/api-docs/**
+              filters:
+                - RewritePath=/api/users(?<segment>.*), /${segment}
+            - id: incident-service
+              uri: lb://incident-service
+              predicates: Path=/api/incidents/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: incident-service
+                    fallbackUri: forward:/fallback/incidents
+            - id: notification-service
+              uri: lb://notification-service
+              predicates: Path=/api/notifications/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: notification-service
+                    fallbackUri: forward:/fallback/notifications
+            - id: user-service
+              uri: lb://user-service
+              predicates: Path=/api/users/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: user-service
+                    fallbackUri: forward:/fallback/users
+    loadbalancer:
+      ribbon:
+        enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/ims}
+
+eureka:
+  instance:
+    hostname: discovery-service
+  client:
+    service-url:
+      defaultZone: http://discovery-service:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

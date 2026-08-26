@@ -152,4 +152,70 @@ class NotificationControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void shouldReturnEmptyListWhenNoNotifications() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/notifications")
+                        .param("userId", userId.toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void listEndpointShouldNotExposeMessageField() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Notification notification = Notification.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(userId)
+                .incidentId(UUID.randomUUID())
+                .title("Test")
+                .message("Sensitive message content")
+                .status(NotificationStatus.UNREAD)
+                .createdAt(Instant.now())
+                .build();
+
+        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                .thenReturn(List.of(notification));
+
+        mockMvc.perform(get("/api/notifications")
+                        .param("userId", userId.toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].message").doesNotExist())
+                .andExpect(jsonPath("$[0].userId").doesNotExist())
+                .andExpect(jsonPath("$[0].incidentId").doesNotExist())
+                .andExpect(jsonPath("$[0].title").value("Test"));
+    }
+
+    @Test
+    void byIdEndpointShouldExposeMessageField() throws Exception {
+        UUID notificationId = UUID.randomUUID();
+        Notification notification = Notification.builder()
+                .id(notificationId)
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(UUID.randomUUID())
+                .incidentId(UUID.randomUUID())
+                .title("Test")
+                .message("Full message content")
+                .status(NotificationStatus.UNREAD)
+                .createdAt(Instant.now())
+                .build();
+
+        when(notificationRepository.findById(notificationId))
+                .thenReturn(Optional.of(notification));
+
+        mockMvc.perform(get("/api/notifications/{id}", notificationId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Full message content"))
+                .andExpect(jsonPath("$.userId").exists())
+                .andExpect(jsonPath("$.incidentId").exists());
+    }
 }

@@ -159,4 +159,38 @@ class OutboxPollerTest {
         verify(outboxEventRepository, never()).save(badEvent);
         verify(outboxEventRepository).save(goodEvent);
     }
+
+    @Test
+    void shouldContinueWhenPublishThrowsException() {
+        UUID incidentId1 = UUID.randomUUID();
+        UUID incidentId2 = UUID.randomUUID();
+
+        OutboxEvent event1 = new OutboxEvent();
+        event1.setId(UUID.randomUUID());
+        event1.setAggregateId(incidentId1);
+        event1.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        event1.setPayload("{\"incidentId\":\"" + incidentId1 + "\"}");
+        event1.setPublished(false);
+        event1.setCreatedAt(Instant.now());
+
+        OutboxEvent event2 = new OutboxEvent();
+        event2.setId(UUID.randomUUID());
+        event2.setAggregateId(incidentId2);
+        event2.setEventType(IncidentEvent.INCIDENT_ASSIGNED.name());
+        event2.setPayload("{\"incidentId\":\"" + incidentId2 + "\"}");
+        event2.setPublished(false);
+        event2.setCreatedAt(Instant.now());
+
+        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(event1, event2));
+        doThrow(new RuntimeException("RabbitMQ connection lost"))
+                .when(eventPublisher).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
+
+        poller.processOutbox();
+
+        // event1 failed to publish, should NOT be marked as published
+        verify(outboxEventRepository, never()).save(event1);
+        // event2 should still be processed and published
+        verify(eventPublisher).publish(eq(IncidentEvent.INCIDENT_ASSIGNED), any());
+        verify(outboxEventRepository).save(event2);
+    }
 }

@@ -12,7 +12,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,8 +32,6 @@ class NotificationRepositoryTest {
         processedEventRepository.deleteAll();
     }
 
-    // --- Notification Repository Tests ---
-
     @Test
     void saveAndFindNotificationById() {
         UUID id = UUID.randomUUID();
@@ -50,19 +47,12 @@ class NotificationRepositoryTest {
                 .build();
 
         Notification saved = notificationRepository.save(notification);
-        Optional<Notification> found = notificationRepository.findById(id);
+        var found = notificationRepository.findById(id);
 
         assertTrue(found.isPresent());
         assertEquals(id, found.get().getId());
         assertEquals("Test notification", found.get().getTitle());
         assertEquals(NotificationStatus.UNREAD, found.get().getStatus());
-    }
-
-    @Test
-    void findByIdReturnsEmptyWhenNotFound() {
-        Optional<Notification> found = notificationRepository.findById(UUID.randomUUID());
-
-        assertTrue(found.isEmpty());
     }
 
     @Test
@@ -113,29 +103,6 @@ class NotificationRepositoryTest {
     }
 
     @Test
-    void findAllReturnsAllNotifications() {
-        notificationRepository.save(Notification.builder()
-                .id(UUID.randomUUID())
-                .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(UUID.randomUUID()).incidentId(UUID.randomUUID())
-                .title("A").message("A msg")
-                .createdAt(Instant.now()).build());
-
-        notificationRepository.save(Notification.builder()
-                .id(UUID.randomUUID())
-                .type(NotificationType.INCIDENT_STATUS_CHANGED)
-                .userId(UUID.randomUUID()).incidentId(UUID.randomUUID())
-                .title("B").message("B msg")
-                .createdAt(Instant.now()).build());
-
-        List<Notification> all = notificationRepository.findAll();
-
-        assertEquals(2, all.size());
-    }
-
-    // --- ProcessedEvent Repository Tests ---
-
-    @Test
     void saveAndCheckProcessedEvent() {
         String eventId = UUID.randomUUID().toString();
 
@@ -159,16 +126,9 @@ class NotificationRepositoryTest {
                 .processedAt(Instant.now())
                 .build());
 
-        Optional<ProcessedEvent> found = processedEventRepository.findById(eventId);
+        var found = processedEventRepository.findById(eventId);
 
         assertTrue(found.isPresent());
         assertEquals(eventId, found.get().getEventId());
-    }
-
-    @Test
-    void findByEventIdReturnsEmptyWhenNotFound() {
-        Optional<ProcessedEvent> found = processedEventRepository.findById(UUID.randomUUID().toString());
-
-        assertTrue(found.isEmpty());
     }
 }

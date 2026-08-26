@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.ims.shared.exception.NotFoundException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -61,11 +62,11 @@ public class IncidentController {
     public ResponseEntity<IncidentResponse> createIncident(
             @Valid @RequestBody CreateIncidentRequest request) {
 
-        IncidentPriority priority = parseEnum(IncidentPriority.class, request.getPriority(), "priority");
+        IncidentPriority priority = parseEnum(IncidentPriority.class, request.priority(), "priority");
 
         Incident incident = incidentService.createIncident(
-                request.getTitle(),
-                request.getDescription(),
+                request.title(),
+                request.description(),
                 priority);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(incident));
@@ -86,8 +87,8 @@ public class IncidentController {
 
         Incident incident = incidentService.assignIncident(
                 id,
-                request.getAssigneeId(),
-                request.getTeamId());
+                request.assigneeId(),
+                request.teamId());
 
         return ResponseEntity.ok(toResponse(incident));
     }
@@ -105,7 +106,7 @@ public class IncidentController {
             @Parameter(description = "Incident UUID") @PathVariable("id") UUID id,
             @Valid @RequestBody TransitionIncidentRequest request) {
 
-        IncidentStatus newStatus = parseEnum(IncidentStatus.class, request.getNewStatus(), "status");
+        IncidentStatus newStatus = parseEnum(IncidentStatus.class, request.newStatus(), "status");
 
         Incident incident = incidentService.transitionIncident(id, newStatus);
 
@@ -178,16 +179,15 @@ public class IncidentController {
     }
 
     private IncidentResponse toResponse(Incident incident) {
-        return IncidentResponse.builder()
-                .id(incident.getId())
-                .title(incident.getTitle())
-                .description(incident.getDescription())
-                .status(incident.getStatus() != null ? incident.getStatus().name() : null)
-                .priority(incident.getPriority() != null ? incident.getPriority().name() : null)
-                .assigneeId(incident.getAssigneeId())
-                .teamId(incident.getTeamId())
-                .createdAt(incident.getCreatedAt())
-                .updatedAt(incident.getUpdatedAt())
-                .build();
+        return new IncidentResponse(
+                incident.getId(),
+                incident.getTitle(),
+                incident.getDescription(),
+                incident.getStatus() != null ? incident.getStatus().name() : null,
+                incident.getPriority() != null ? incident.getPriority().name() : null,
+                incident.getAssigneeId(),
+                incident.getTeamId(),
+                incident.getCreatedAt(),
+                incident.getUpdatedAt());
     }
 }

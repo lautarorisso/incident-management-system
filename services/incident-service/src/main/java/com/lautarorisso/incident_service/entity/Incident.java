@@ -12,7 +12,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -27,14 +26,14 @@ import java.util.UUID;
 @Table(name = "incidents")
 @Getter
 @Setter
-@ToString
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Incident {
 
     @Id
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(nullable = false)

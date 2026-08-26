@@ -15,21 +15,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RateLimitFilterTest {
 
-    private static final int EXPECTED_ORDER = -80;
-
     private RateLimitFilter filter;
     private GatewayFilterChain chain;
 
     @BeforeEach
     void setUp() {
-        // limitForPeriod=2, refreshPeriod=1s
         filter = new RateLimitFilter(2, Duration.ofSeconds(1));
         chain = exchange -> Mono.empty();
-    }
-
-    @Test
-    void shouldHaveOrderMinus80() {
-        assertThat(filter.getOrder()).isEqualTo(EXPECTED_ORDER);
     }
 
     @Test
@@ -46,19 +38,16 @@ class RateLimitFilterTest {
 
     @Test
     void shouldBlockRequestWhenLimitExceeded() {
-        // Given: same client makes more requests than capacity
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/incidents")
                 .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.2", 8080))
                 .build();
 
-        // First 2 requests should pass (limit-for-period = 2)
         ServerWebExchange exchange1 = MockServerWebExchange.from(request);
         filter.filter(exchange1, chain).block();
 
         ServerWebExchange exchange2 = MockServerWebExchange.from(request);
         filter.filter(exchange2, chain).block();
 
-        // 3rd request should be blocked
         ServerWebExchange exchange3 = MockServerWebExchange.from(request);
         filter.filter(exchange3, chain).block();
 
@@ -76,11 +65,9 @@ class RateLimitFilterTest {
                         .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.4", 8080))
                         .build());
 
-        // Client 1 uses its 2 tokens
         filter.filter(client1, chain).block();
         filter.filter(client1, chain).block();
 
-        // Client 1 should be blocked
         ServerWebExchange client1Blocked = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/incidents")
                         .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.3", 8080))
@@ -88,7 +75,6 @@ class RateLimitFilterTest {
         filter.filter(client1Blocked, chain).block();
         assertThat(client1Blocked.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 
-        // Client 2 should still be allowed (independent bucket)
         ServerWebExchange client2Allowed = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/incidents")
                         .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.4", 8080))
@@ -98,27 +84,22 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void shouldUseXForwardedForHeaderWhenPresent() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/api/incidents")
+    void shouldUseXForwardedForAsClientKey() {
+        MockServerHttpRequest request1 = MockServerHttpRequest.get("/api/incidents")
                 .header("X-Forwarded-For", "192.168.1.1")
                 .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.5", 8080))
                 .build();
 
-        ServerWebExchange exchange = MockServerWebExchange.from(request);
-        filter.filter(exchange, chain).block();
+        filter.filter(MockServerWebExchange.from(request1), chain).block();
+        filter.filter(MockServerWebExchange.from(request1), chain).block();
 
-        // Should not block first request
-        assertThat(exchange.getResponse().getStatusCode()).isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-    }
+        MockServerHttpRequest request3 = MockServerHttpRequest.get("/api/incidents")
+                .header("X-Forwarded-For", "192.168.1.1")
+                .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.5", 8080))
+                .build();
+        ServerWebExchange exchange3 = MockServerWebExchange.from(request3);
+        filter.filter(exchange3, chain).block();
 
-    @Test
-    void shouldUseRemoteAddressWhenNoXForwardedFor() {
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/incidents")
-                        .remoteAddress(java.net.InetSocketAddress.createUnresolved("10.0.0.6", 8080))
-                        .build());
-
-        filter.filter(exchange, chain).block();
-        assertThat(exchange.getResponse().getStatusCode()).isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(exchange3.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 }

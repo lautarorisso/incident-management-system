@@ -1,23 +1,14 @@
 package com.lautarorisso.notification_service.exception;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
+import com.ims.shared.exception.BaseGlobalExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 /**
- * Maps application exceptions to HTTP responses.
+ * Global exception handler for notification-service REST endpoints.
  * <p>
- * Invalid input (e.g. an unknown notification status filter) maps to 400
- * instead of the framework default 500.
+ * Extends {@link BaseGlobalExceptionHandler} for common exceptions
+ * (404, 400, 409, 502, validation, catch-all).
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
-        return ResponseEntity.badRequest()
-                .body(Map.of("error", e.getMessage()));
-    }
+public class GlobalExceptionHandler extends BaseGlobalExceptionHandler {
 }

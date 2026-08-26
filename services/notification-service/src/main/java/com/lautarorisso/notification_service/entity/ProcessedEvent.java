@@ -20,13 +20,14 @@ import java.time.Instant;
 @Document(collection = "processed_events")
 @Getter
 @ToString
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProcessedEvent {
 
     @Id
+    @EqualsAndHashCode.Include
     private String eventId;
 
     private Instant processedAt;

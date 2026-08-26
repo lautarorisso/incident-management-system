@@ -2,7 +2,7 @@
 
 Microservices-based incident management system built with Spring Boot 3.5, Spring Cloud 2025, and Java 21.
 
-> **Note**: This is a work-in-progress MVP for portfolio demonstration. JWT validation via Keycloak is planned but not yet implemented. The system runs with a simplified local stack (PostgreSQL, RabbitMQ, Eureka, API Gateway + 3 domain services).
+> **Note**: This is a work-in-progress MVP for portfolio demonstration. JWT validation via Keycloak is planned but not yet fully implemented.
 
 ## Architecture
 
@@ -22,18 +22,20 @@ Microservices-based incident management system built with Spring Boot 3.5, Sprin
 └───────┬────────┘ └──────┬───────┘ └──────┬───────┘
         │                 │                │
    ┌────▼────┐      ┌────▼────┐     ┌────▼────┐
-   │PostgreSQL│     │PostgreSQL│    │PostgreSQL│
-   │incident_db│   │notific._db│   │ user_db  │
+   │PostgreSQL│     │ MongoDB  │    │PostgreSQL│
+   │incident_db│   │notification_db│ │ user_db  │
    └─────────┘     └─────────┘    └─────────┘
-                        │
-                   ┌────▼────┐
-                   │RabbitMQ │
-                   └─────────┘
+        │                 │
+        └────────┬────────┘
+            ┌────▼────┐
+            │RabbitMQ │
+            └─────────┘
 
-┌─────────────────────────────────────────────┐
-│ discovery-service (Eureka) :8761            │
-│ PostgreSQL :5432  |  RabbitMQ :5672/15672   │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ discovery-service (Eureka) :8761                      │
+│ config-server :8888                                   │
+│ PostgreSQL :5432 | MongoDB :27017 | RabbitMQ :5672    │
+└──────────────────────────────────────────────────────┘
 ```
 
 All domain services use a **layered architecture** (controller → service → repository), where the JPA entity serves as both the persistence and domain model. Cross-service DTOs and shared infrastructure beans live in the `services/shared` module.
@@ -43,6 +45,7 @@ All domain services use a **layered architecture** (controller → service → r
 | Service | Port | Description |
 |---------|------|-------------|
 | api-gateway | 8080 | Routing, rate limiting, circuit breakers, request logging (JWT validation pending Keycloak) |
+| config-server | 8888 | Spring Cloud Config Server — central configuration for all services |
 | discovery-service | 8761 | Eureka Service Discovery Server |
 | incident-service | 8081 | Incident CRUD, state machine, outbox pattern, RabbitMQ events |
 | notification-service | 8083 | Consumes incident events from RabbitMQ, persists and delivers notifications |
@@ -53,53 +56,33 @@ All domain services use a **layered architecture** (controller → service → r
 | Component | Port | UI |
 |-----------|------|----|
 | PostgreSQL | 5432 | — |
+| MongoDB | 27017 | — |
 | RabbitMQ | 5672 | http://localhost:15672 |
 
 ## Prerequisites
 
-- Java 21
-- Docker & Docker Compose (for infrastructure: PostgreSQL, RabbitMQ)
+- Docker & Docker Compose
 
 ## Quick Start
 
-### 1. Start infrastructure
-
 ```bash
-docker-compose up -d postgres rabbitmq
+git clone <repo-url>
+cd incident-management-system
+docker compose up -d --build
 ```
 
-### 2. Build the project
+This builds and starts all 9 containers (3 infra + 6 services). Wait ~60 seconds for all services to register in Eureka, then:
 
-```bash
-./mvnw clean install -DskipTests
-```
-
-### 3. Start services (in order)
-
-Open separate terminals for each service. Start them in this order:
-
-```bash
-# Discovery first — all other services register here
-./mvnw spring-boot:run -pl services/discovery-service
-
-# Gateway
-./mvnw spring-boot:run -pl services/api-gateway
-
-# Domain services (order independent)
-./mvnw spring-boot:run -pl services/incident-service
-./mvnw spring-boot:run -pl services/notification-service
-./mvnw spring-boot:run -pl services/user-service
-```
-
-### Or with Docker (full stack)
-
-```bash
-docker-compose up -d --build
-```
-
-This builds and starts all 7 containers (2 infra + 5 services).
+| URL | What |
+|-----|------|
+| http://localhost:8080 | API Gateway |
+| http://localhost:8761 | Eureka Dashboard |
+| http://localhost:8888 | Config Server Health |
+| http://localhost:15672 | RabbitMQ Management UI (guest/guest) |
 
 ## Running Tests
+
+Tests require Java 21 and Maven locally (Docker builds don't run tests).
 
 Run all tests from the project root:
 
@@ -110,6 +93,7 @@ Run all tests from the project root:
 Run tests for a specific service:
 
 ```bash
+./mvnw test -pl services/config-server
 ./mvnw test -pl services/incident-service
 ./mvnw test -pl services/notification-service
 ./mvnw test -pl services/user-service
@@ -125,7 +109,7 @@ Run a specific test class:
 
 ## Smoke Test
 
-After starting all services, run the end-to-end smoke test:
+After starting all services with Docker, run the end-to-end smoke test:
 
 ```bash
 ./scripts/smoke-test.sh
@@ -133,7 +117,8 @@ After starting all services, run the end-to-end smoke test:
 
 The smoke test validates:
 - Health checks for all 5 services
-- Create an incident (via API Gateway)
+- Keycloak authentication (password grant against the `ims` realm)
+- Create an incident (via API Gateway, with bearer token)
 - Retrieve and list incidents
 - Verify notification was created
 - Check user service availability
@@ -143,6 +128,37 @@ To test against Docker deployments:
 ```bash
 GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 ```
+
+### Authentication (Keycloak)
+
+The gateway is a JWT resource server: every `/api/**` request requires a
+bearer token issued by a Keycloak `ims` realm. Realm roles map to authorities as
+`ims-admin → ROLE_ADMIN`, `ims-agent → ROLE_AGENT`, `ims-user → ROLE_USER`.
+
+> **Note**: JWT validation is configured via Config Server (`KEYCLOAK_ISSUER_URI`).
+> For local development without Keycloak, the gateway permits all requests.
+
+| Route | Required roles |
+|-------|----------------|
+| `POST /api/incidents` | ADMIN, AGENT or USER |
+| `PUT /api/incidents/{id}/assign`, `PUT /api/incidents/{id}/transition` | ADMIN, AGENT |
+| `GET /api/incidents/**`, `/api/notifications/**` | any authenticated user |
+| `/api/users/**`, `/api/teams/**` | ADMIN, AGENT |
+| actuator, scalar, api-docs, eureka | public |
+
+To obtain a token manually (dev client with direct access grants enabled):
+
+```bash
+curl -s http://localhost:18080/realms/ims/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=ims-frontend \
+  -d username=agente1 -d password=agente1234 | jq -r .access_token
+
+# then call the API through the gateway
+curl -s http://localhost:8080/api/users -H "Authorization: Bearer $TOKEN"
+```
+
+Smoke test auth knobs (all optional): `KEYCLOAK_URL`, `KEYCLOAK_REALM`,
+`KEYCLOAK_CLIENT`, `SMOKE_USER`, `SMOKE_PASSWORD`.
 
 ## Per-Service Reference
 
@@ -165,13 +181,41 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 
 ---
 
+### config-server
+
+| Attribute | Value |
+|-----------|-------|
+| Port | 8888 |
+| Package | `services/config-server` |
+| Role | Spring Cloud Config Server — serves centralized configuration to all services |
+| Dependencies | `discovery-service` |
+| Test command | `./mvnw test -pl services/config-server` |
+| Start command | `./mvnw spring-boot:run -pl services/config-server` |
+| Health endpoint | http://localhost:8888/actuator/health |
+
+**Key config** (`application.properties`):
+- `spring.profiles.active=native` — reads YAML files from filesystem
+- `spring.cloud.config.server.native.search-locations=file:${CONFIG_DIR:./}` — config directory
+- Config files live in `services/config-server/config/`
+
+**Config files** (served to other services):
+| File | Service | Key settings |
+|------|---------|-------------|
+| `api-gateway.yaml` | api-gateway | Routes, JWT issuer URI, circuit breakers |
+| `incident-service.yaml` | incident-service | PostgreSQL, RabbitMQ, Eureka |
+| `notification-service.yaml` | notification-service | MongoDB, RabbitMQ, Eureka |
+| `user-service.yaml` | user-service | PostgreSQL, Eureka |
+| `discovery-service.yaml` | discovery-service | Eureka standalone config |
+
+---
+
 ### api-gateway
 
 | Attribute | Value |
 |-----------|-------|
 | Port | 8080 |
 | Package | `services/api-gateway` |
-| Role | Spring Cloud Gateway — routing, rate limiting, circuit breakers (JWT validation pending Keycloak) |
+| Role | Spring Cloud Gateway — routing, JWT validation (Keycloak `ims` realm), role-based authorization, rate limiting, circuit breakers |
 | Dependencies | `discovery-service` |
 | Test command | `./mvnw test -pl services/api-gateway` |
 | Start command | `./mvnw spring-boot:run -pl services/api-gateway` |
@@ -244,7 +288,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | Port | 8083 |
 | Package | `services/notification-service` |
 | Role | Consume incident events from RabbitMQ, create and persist notifications |
-| Dependencies | `postgres`, `rabbitmq`, `discovery-service` |
+| Dependencies | `mongo`, `rabbitmq`, `discovery-service` |
 | Test command | `./mvnw test -pl services/notification-service` |
 | Start command | `./mvnw spring-boot:run -pl services/notification-service` |
 | Health endpoint | http://localhost:8083/actuator/health |
@@ -254,7 +298,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 - `controller/` — `NotificationController`, `GlobalExceptionHandler`
 - `service/` — `NotificationRoutingService`
 - `messaging/` — `IncidentEventListener` (@RabbitListener with idempotency), `RabbitMqConfig`
-- `repository/` — Spring Data JPA repositories
+- `repository/` — Spring Data MongoDB repositories
 - `entity/` — `Notification`, `ProcessedEvent`, enums
 - `notifier/` — `EmailNotificationSender`
 
@@ -263,9 +307,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 **Key config** (overridable via env vars):
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/notification_db` | PostgreSQL JDBC URL |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` | DB username |
-| `SPRING_DATASOURCE_PASSWORD` | `postgres` | DB password |
+| `SPRING_DATA_MONGODB_URI` | `mongodb://localhost:27017/notification_db` | MongoDB connection URI |
 | `SPRING_RABBITMQ_HOST` | `localhost` | RabbitMQ host |
 | `notification.email.enabled` | `true` | Set `false` to log notifications instead of sending email |
 | `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | `http://localhost:8761/eureka` | Eureka server URL |
@@ -318,6 +360,7 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 |----------|-------------|
 | http://localhost:8080 | API Gateway |
 | http://localhost:8761 | Eureka Dashboard |
+| http://localhost:8888 | Config Server Health |
 | http://localhost:15672 | RabbitMQ Management UI |
 | http://localhost:8081/scalar | Incident Service API Docs |
 | http://localhost:8083/scalar | Notification Service API Docs |
@@ -329,11 +372,12 @@ GATEWAY_URL=http://localhost:8080 ./scripts/smoke-test.sh
 | Component | Version | Internal Host | Port(s) | UI |
 |-----------|---------|---------------|---------|-----|
 | PostgreSQL | 16 | `postgres` | 5432 | — |
+| MongoDB | 7 | `mongo` | 27017 | — |
 | RabbitMQ | 3-management | `rabbitmq` | 5672, 15672 | http://localhost:15672 |
 
 ## Environment Variables
 
-Copy `.env` from the project root to configure defaults:
+`docker compose up` works out of the box with built-in defaults (see `docker-compose.yml`). To override, create a `.env` file in the project root:
 
 ```bash
 POSTGRES_USER=postgres
@@ -342,28 +386,28 @@ RABBITMQ_USER=guest
 RABBITMQ_PASS=guest
 ```
 
-For deployments against the homelab infrastructure, also set `HOMELAB_IP` (see `docker-compose.homelab.yml`).
-
 ## Configuration
 
-Each service has a local `application.yaml` with default settings suitable for local development (localhost URLs, embedded H2 in tests). Services use `spring.config.import: "optional:configserver:http://homelab:8888"`, so they start fine without a Config Server and pick up remote config when it is available.
+Services use `spring.config.import: "optional:configserver:"` with Eureka discovery to pull configuration from the Config Server. When the Config Server is available (Docker Compose), services receive centralized config from `services/config-server/config/*.yaml`.
 
-For Docker Compose deployments, environment variables in `docker-compose.yml` override the local defaults (e.g., `SPRING_DATASOURCE_URL` points to the `postgres` hostname).
+Environment variables in `docker-compose.yml` override Config Server values (Spring precedence: env var > config server > local `application.yaml`).
 
 ## Project Structure
 
 ```
 incident-management-system/
-├── docker-compose.yml          # Full local stack orchestration
-├── docker-compose.homelab.yml  # Deployment against homelab infra
-├── Dockerfile                  # Multi-stage build for all services (SERVICE arg)
+├── docker-compose.yml          # Full local stack (clone & run)
+├── Dockerfile                  # Multi-stage build for all services
+├── .dockerignore               # Keeps build context lean
 ├── pom.xml                     # Parent Maven POM (multi-module)
 ├── mvnw                        # Maven wrapper
-├── .env                        # Environment variable defaults
 ├── scripts/
 │   ├── init-db.sql             # Database initialization
 │   └── smoke-test.sh           # End-to-end smoke test
 └── services/
+    ├── config-server/          # Spring Cloud Config Server
+    │   ├── config/             # YAML configs served to other services
+    │   └── Dockerfile          # Config Server Docker build
     ├── api-gateway/            # Spring Cloud Gateway
     ├── discovery-service/      # Eureka Service Registry
     ├── incident-service/       # Incident domain (layered)

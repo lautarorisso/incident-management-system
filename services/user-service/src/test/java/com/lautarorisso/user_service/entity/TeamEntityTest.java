@@ -22,9 +22,10 @@ class TeamEntityTest {
 
     @Test
     void shouldSaveAndFindTeamById() {
-        var entity = new Team();
-        entity.setName("SRE");
-        entity.setDescription("Site Reliability Engineering");
+        var entity = Team.builder()
+                .name("SRE")
+                .description("Site Reliability Engineering")
+                .build();
 
         var saved = teamRepo.save(entity);
         assertNotNull(saved.getId());

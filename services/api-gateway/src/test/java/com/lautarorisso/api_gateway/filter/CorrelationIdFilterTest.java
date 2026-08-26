@@ -13,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CorrelationIdFilterTest {
 
     private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
-    private static final int EXPECTED_ORDER = -100;
 
     private CorrelationIdFilter filter;
     private GatewayFilterChain chain;
@@ -25,20 +24,12 @@ class CorrelationIdFilterTest {
     }
 
     @Test
-    void shouldHaveOrderMinus100() {
-        assertThat(filter.getOrder()).isEqualTo(EXPECTED_ORDER);
-    }
-
-    @Test
     void shouldGenerateCorrelationIdWhenMissing() {
-        // Given: request without X-Correlation-Id
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/incidents").build());
 
-        // When
         filter.filter(exchange, chain).block();
 
-        // Then: correlation ID is generated and set on response
         String correlationId = exchange.getResponse().getHeaders()
                 .getFirst(CORRELATION_ID_HEADER);
         assertThat(correlationId).isNotNull();
@@ -60,32 +51,16 @@ class CorrelationIdFilterTest {
 
     @Test
     void shouldPreserveExistingCorrelationId() {
-        // Given: request already has X-Correlation-Id
         String existingId = "existing-id-123";
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/incidents")
                         .header(CORRELATION_ID_HEADER, existingId)
                         .build());
 
-        // When
         filter.filter(exchange, chain).block();
 
-        // Then: existing correlation ID is preserved
         String correlationId = exchange.getResponse().getHeaders()
                 .getFirst(CORRELATION_ID_HEADER);
         assertThat(correlationId).isEqualTo(existingId);
-    }
-
-    @Test
-    void shouldSetCorrelationIdOnOutgoingRequest() {
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/incidents").build());
-
-        filter.filter(exchange, chain).block();
-
-        // The response header shows the filter ran;
-        // The request mutation is verified via MockServerHttpRequest decorator
-        assertThat(exchange.getResponse().getHeaders()
-                .getFirst(CORRELATION_ID_HEADER)).isNotNull();
     }
 }

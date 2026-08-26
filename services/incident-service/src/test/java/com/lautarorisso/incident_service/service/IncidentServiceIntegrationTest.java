@@ -1,6 +1,6 @@
 package com.lautarorisso.incident_service.service;
 
-import com.lautarorisso.incident_service.exception.NotFoundException;
+import com.ims.shared.exception.NotFoundException;
 import com.lautarorisso.incident_service.client.UserServiceClient;
 import com.lautarorisso.incident_service.entity.Incident;
 import com.lautarorisso.incident_service.entity.IncidentEvent;
@@ -166,7 +166,7 @@ class IncidentServiceIntegrationTest {
         var all = incidentService.listIncidents(
                 null, null, null, null,
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")));
-        assertTrue(all.getTotalElements() >= 3);
+        assertEquals(3, all.getTotalElements());
     }
 
     @Test

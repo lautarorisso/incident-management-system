@@ -106,26 +106,24 @@ public class NotificationController {
     // --- Manual mapping helpers (no MapStruct) ---
 
     private NotificationResponse toResponse(Notification notification) {
-        return NotificationResponse.builder()
-                .id(notification.getId())
-                .type(notification.getType() != null ? notification.getType().name() : null)
-                .userId(notification.getUserId())
-                .incidentId(notification.getIncidentId())
-                .title(notification.getTitle())
-                .message(notification.getMessage())
-                .status(notification.getStatus() != null ? notification.getStatus().name() : null)
-                .createdAt(notification.getCreatedAt())
-                .build();
+        return new NotificationResponse(
+                notification.getId(),
+                notification.getType() != null ? notification.getType().name() : null,
+                notification.getUserId(),
+                notification.getIncidentId(),
+                notification.getTitle(),
+                notification.getMessage(),
+                notification.getStatus() != null ? notification.getStatus().name() : null,
+                notification.getCreatedAt());
     }
 
     private NotificationListItem toListItem(Notification notification) {
-        return NotificationListItem.builder()
-                .id(notification.getId())
-                .type(notification.getType() != null ? notification.getType().name() : null)
-                .title(notification.getTitle())
-                .status(notification.getStatus() != null ? notification.getStatus().name() : null)
-                .createdAt(notification.getCreatedAt())
-                .build();
+        return new NotificationListItem(
+                notification.getId(),
+                notification.getType() != null ? notification.getType().name() : null,
+                notification.getTitle(),
+                notification.getStatus() != null ? notification.getStatus().name() : null,
+                notification.getCreatedAt());
     }
 
     private List<NotificationListItem> toListItemList(List<Notification> notifications) {

@@ -1,5 +1,6 @@
 package com.lautarorisso.notification_service.messaging;
 
+import com.lautarorisso.notification_service.entity.Notification;
 import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.entity.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
@@ -232,5 +233,90 @@ class IncidentEventListenerTest {
                 p.getEventId().equals(firstEventId)));
         verify(processedEventRepository).save(argThat(p ->
                 p.getEventId().equals(secondEventId)));
+    }
+
+    @Test
+    void senderFailureMarksNotificationFailed() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+        doThrow(new RuntimeException("SMTP down"))
+                .when(notificationSender).send(any(Notification.class));
+
+        listener.handleIncidentEvent(event);
+
+        // save called twice: UNREAD + FAILED (sender error)
+        verify(notificationRepository, times(2)).save(argThat(n ->
+                n.getUserId().equals(assigneeId)));
+        // Verify the FAILED status was saved (not SENT)
+        verify(notificationRepository).save(argThat(n ->
+                n.getStatus() == NotificationStatus.FAILED));
+        verify(notificationRepository).save(argThat(n ->
+                n.getStatus() == NotificationStatus.UNREAD));
+    }
+
+    @Test
+    void buildMessageContainsIncidentIdForAssigned() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        listener.handleIncidentEvent(event);
+
+        verify(notificationRepository, atLeastOnce()).save(argThat(n ->
+                n.getMessage().contains(incidentId) &&
+                 n.getType() == NotificationType.INCIDENT_ASSIGNED));
+    }
+
+    @Test
+    void buildMessageContainsIncidentIdForStatusChanged() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_STATUS_CHANGED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_STATUS_CHANGED"))
+                .thenReturn(NotificationType.INCIDENT_STATUS_CHANGED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_STATUS_CHANGED))
+                .thenReturn("Incident status has changed");
+
+        listener.handleIncidentEvent(event);
+
+        verify(notificationRepository, atLeastOnce()).save(argThat(n ->
+                n.getMessage().contains(incidentId) &&
+                 n.getType() == NotificationType.INCIDENT_STATUS_CHANGED));
     }
 }

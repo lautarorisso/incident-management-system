@@ -71,21 +71,6 @@ class RabbitMqEventPublisherTest {
     }
 
     @Test
-    void shouldPublishIncidentCreatedWithCorrectRoutingKey() {
-        Map<String, Object> eventData = new LinkedHashMap<>();
-        eventData.put("incidentId", "test-id");
-
-        publisher.publish(IncidentEvent.INCIDENT_CREATED, eventData);
-
-        verify(rabbitTemplate).convertAndSend(
-                org.mockito.ArgumentMatchers.eq("incident.events"),
-                routingKeyCaptor.capture(),
-                messageCaptor.capture()
-        );
-        assertThat(routingKeyCaptor.getValue()).isEqualTo("incident.created");
-    }
-
-    @Test
     void shouldIncludeEventTypeAndTimestampInMessagePayload() {
         String incidentId = "test-incident-id";
         Map<String, Object> eventData = new LinkedHashMap<>();

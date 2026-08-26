@@ -24,12 +24,13 @@ class UserEntityTest {
 
     @Test
     void shouldSaveAndFindUserById() {
-        var entity = new User();
-        entity.setKeycloakId(UUID.randomUUID());
-        entity.setUsername("jdoe");
-        entity.setDisplayName("John Doe");
-        entity.setEmail("john@example.com");
-        entity.setActive(true);
+        var entity = User.builder()
+                .keycloakId(UUID.randomUUID())
+                .username("jdoe")
+                .displayName("John Doe")
+                .email("john@example.com")
+                .active(true)
+                .build();
 
         var saved = userRepo.save(entity);
         assertNotNull(saved.getId());
@@ -45,13 +46,14 @@ class UserEntityTest {
     @Test
     void shouldPersistTeamIds() {
         UUID teamId = UUID.randomUUID();
-        var entity = new User();
-        entity.setKeycloakId(UUID.randomUUID());
-        entity.setUsername("jdoe");
-        entity.setDisplayName("John Doe");
-        entity.setEmail("john@example.com");
-        entity.setActive(true);
-        entity.setTeamIds(List.of(teamId));
+        var entity = User.builder()
+                .keycloakId(UUID.randomUUID())
+                .username("jdoe")
+                .displayName("John Doe")
+                .email("john@example.com")
+                .active(true)
+                .teamIds(List.of(teamId))
+                .build();
 
         var saved = userRepo.save(entity);
         var found = userRepo.findById(saved.getId());

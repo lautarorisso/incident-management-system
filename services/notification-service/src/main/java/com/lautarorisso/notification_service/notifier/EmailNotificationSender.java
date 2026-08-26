@@ -1,9 +1,9 @@
 package com.lautarorisso.notification_service.notifier;
 
+import com.ims.shared.exception.NotificationDeliveryException;
 import com.lautarorisso.notification_service.entity.Notification;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -13,17 +13,21 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class EmailNotificationSender {
 
     private final JavaMailSender mailSender;
+    private final String fromAddress;
+    private final boolean emailEnabled;
 
-    @Value("${notification.email.from:no-reply@ims.local}")
-    private String fromAddress;
-
-    @Value("${notification.email.enabled:true}")
-    private boolean emailEnabled;
+    public EmailNotificationSender(
+            JavaMailSender mailSender,
+            @Value("${notification.email.from:no-reply@ims.local}") String fromAddress,
+            @Value("${notification.email.enabled:true}") boolean emailEnabled) {
+        this.mailSender = mailSender;
+        this.fromAddress = fromAddress;
+        this.emailEnabled = emailEnabled;
+    }
 
     public void send(Notification notification) {
         if (!emailEnabled) {
@@ -101,11 +105,5 @@ public class EmailNotificationSender {
             notification.getId(),
             notification.getCreatedAt()
         );
-    }
-
-    public static class NotificationDeliveryException extends RuntimeException {
-        public NotificationDeliveryException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }

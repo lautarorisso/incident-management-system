@@ -11,11 +11,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Builder.Default;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,9 +32,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 @Getter
-@Setter
-@ToString
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -43,6 +40,7 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(name = "keycloak_id", nullable = false, unique = true)

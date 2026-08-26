@@ -58,11 +58,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldCreateIncident() throws Exception {
-        var request = CreateIncidentRequest.builder()
-                .title("Test incident")
-                .description("Test description")
-                .priority("HIGH")
-                .build();
+        var request = new CreateIncidentRequest("Test incident", "Test description", "HIGH");
 
         Incident domain = Incident.builder()
                 .id(incidentUuid)
@@ -89,10 +85,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenCreateTitleIsBlank() throws Exception {
-        var request = CreateIncidentRequest.builder()
-                .title("")
-                .description("Some description")
-                .build();
+        var request = new CreateIncidentRequest("", "Some description", null);
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,9 +95,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenCreateTitleIsNull() throws Exception {
-        var request = CreateIncidentRequest.builder()
-                .description("Some description")
-                .build();
+        var request = new CreateIncidentRequest(null, "Some description", null);
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -114,10 +105,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenCreatePriorityIsInvalid() throws Exception {
-        var request = CreateIncidentRequest.builder()
-                .title("Test")
-                .priority("INVALID")
-                .build();
+        var request = new CreateIncidentRequest("Test", null, "INVALID");
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,10 +120,7 @@ class IncidentControllerTest {
         UUID assigneeId = UUID.randomUUID();
         UUID teamId = UUID.randomUUID();
 
-        var request = AssignIncidentRequest.builder()
-                .assigneeId(assigneeId)
-                .teamId(teamId)
-                .build();
+        var request = new AssignIncidentRequest(assigneeId, teamId);
 
         Incident domain = Incident.builder()
                 .id(incidentUuid)
@@ -163,9 +148,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenAssignAssigneeIdIsNull() throws Exception {
-        var request = AssignIncidentRequest.builder()
-                .teamId(UUID.randomUUID())
-                .build();
+        var request = new AssignIncidentRequest(null, UUID.randomUUID());
 
         mockMvc.perform(put("/api/incidents/{id}/assign", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -177,9 +160,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldTransitionIncident() throws Exception {
-        var request = TransitionIncidentRequest.builder()
-                .newStatus("IN_PROGRESS")
-                .build();
+        var request = new TransitionIncidentRequest("IN_PROGRESS");
 
         Incident domain = Incident.builder()
                 .id(incidentUuid)
@@ -203,9 +184,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenTransitionStatusIsBlank() throws Exception {
-        var request = TransitionIncidentRequest.builder()
-                .newStatus("")
-                .build();
+        var request = new TransitionIncidentRequest("");
 
         mockMvc.perform(put("/api/incidents/{id}/transition", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -215,9 +194,7 @@ class IncidentControllerTest {
 
     @Test
     void shouldReturn400WhenTransitionStatusIsInvalid() throws Exception {
-        var request = TransitionIncidentRequest.builder()
-                .newStatus("INVALID")
-                .build();
+        var request = new TransitionIncidentRequest("INVALID");
 
         mockMvc.perform(put("/api/incidents/{id}/transition", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -263,7 +240,7 @@ class IncidentControllerTest {
     @Test
     void shouldReturn404WhenNotFoundExceptionThrown() throws Exception {
         when(incidentService.getIncident(incidentUuid))
-                .thenThrow(new com.lautarorisso.incident_service.exception.NotFoundException("Incident not found: " + incidentUuid));
+                .thenThrow(new com.ims.shared.exception.NotFoundException("Incident not found: " + incidentUuid));
 
         mockMvc.perform(get("/api/incidents/{id}", incidentUuid))
                 .andExpect(status().isNotFound());
@@ -313,5 +290,19 @@ class IncidentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void shouldReturn400ForInvalidStatusFilter() throws Exception {
+        mockMvc.perform(get("/api/incidents")
+                        .param("status", "BANANA"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400ForInvalidPriorityFilter() throws Exception {
+        mockMvc.perform(get("/api/incidents")
+                        .param("priority", "MEGA_ULTRA_HIGH"))
+                .andExpect(status().isBadRequest());
     }
 }

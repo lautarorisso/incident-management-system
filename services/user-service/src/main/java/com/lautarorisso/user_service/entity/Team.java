@@ -11,8 +11,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -26,9 +24,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "teams")
 @Getter
-@Setter
-@ToString
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -36,6 +32,7 @@ public class Team {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(nullable = false, unique = true)

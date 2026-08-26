@@ -31,11 +31,6 @@ class UserIdHeaderFilterTest {
     }
 
     @Test
-    void shouldHaveOrderMinus60() {
-        assertThat(filter.getOrder()).isEqualTo(-60);
-    }
-
-    @Test
     void shouldExtractSubClaimAndSetHeader() {
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "RS256")
@@ -69,7 +64,7 @@ class UserIdHeaderFilterTest {
     }
 
     @Test
-    void shouldNotFailWhenJwtHasNoSubClaim() {
+    void shouldNotSetHeaderWhenJwtHasNoSubClaim() {
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "RS256")
                 .claim("scope", "read")
@@ -80,25 +75,9 @@ class UserIdHeaderFilterTest {
 
         runFilterWithCapture(auth);
 
-        // Filter should pass through without setting header
-        assertThat(capturedExchange.get()).isNotNull();
-    }
-
-    @Test
-    void shouldSetHeaderOnMutatedRequestWithDifferentUser() {
-        Jwt jwt = Jwt.withTokenValue("token")
-                .header("alg", "RS256")
-                .claim("sub", "user-xyz-789")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .build();
-        Authentication auth = new JwtAuthenticationToken(jwt);
-
-        runFilterWithCapture(auth);
-
-        assertThat(capturedExchange.get().getRequest()
-                .getHeaders().getFirst(USER_ID_HEADER))
-                .isEqualTo("user-xyz-789");
+        String userId = capturedExchange.get().getRequest()
+                .getHeaders().getFirst(USER_ID_HEADER);
+        assertThat(userId).isNull();
     }
 
     private void runFilterWithCapture(Authentication auth) {

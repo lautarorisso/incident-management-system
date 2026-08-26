@@ -1,6 +1,6 @@
 # Multi-stage build for all IMS services.
 # Usage: docker build --build-arg SERVICE=<name> -f Dockerfile .
-# docker-compose passes SERVICE (and optionally SERVICE_PORT) via build.args.
+# docker-compose passes SERVICE via build.args.
 #
 # SERVICE is one of: discovery-service | api-gateway | incident-service |
 #                    notification-service | user-service
@@ -22,7 +22,5 @@ RUN mvn -pl services/$SERVICE -am package -DskipTests -B
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 ARG SERVICE
-ARG SERVICE_PORT=8081
 COPY --from=build /app/services/$SERVICE/target/*.jar app.jar
-EXPOSE $SERVICE_PORT
 ENTRYPOINT ["java", "-jar", "app.jar"]

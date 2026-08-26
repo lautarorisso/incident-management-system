@@ -41,15 +41,15 @@ class UserRepositoryTest {
     }
 
     private void persistUser(String username, UUID teamId) {
-        User entity = new User();
-        entity.setKeycloakId(UUID.randomUUID());
-        entity.setUsername(username);
-        entity.setDisplayName("Display " + username);
-        entity.setEmail(username + "@example.com");
-        entity.setActive(true);
+        var builder = User.builder()
+                .keycloakId(UUID.randomUUID())
+                .username(username)
+                .displayName("Display " + username)
+                .email(username + "@example.com")
+                .active(true);
         if (teamId != null) {
-            entity.setTeamIds(List.of(teamId));
+            builder.teamIds(List.of(teamId));
         }
-        userRepo.save(entity);
+        userRepo.save(builder.build());
     }
 }

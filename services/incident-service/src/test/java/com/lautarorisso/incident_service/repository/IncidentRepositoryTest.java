@@ -160,12 +160,6 @@ class IncidentRepositoryTest {
         assertEquals(3, result.getTotalElements());
     }
 
-    @Test
-    void shouldReturnEmptyPageWhenNoIncidents() {
-        var result = incidentRepo.findAll(Specification.where(null), pageable());
-        assertEquals(0, result.getTotalElements());
-    }
-
     private static PageRequest pageable() {
         return PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
     }

@@ -57,8 +57,7 @@ spring:
                   args:
                     name: user-service
                     fallbackUri: forward:/fallback/users
-  # Auth/JWT is intentionally disabled (SecurityConfig permits all) until
-  # Keycloak is integrated again.
+  # JWT issuer-uri is provided by Config Server (api-gateway.yaml)
 
 eureka:
   instance:

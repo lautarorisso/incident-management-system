@@ -13,6 +13,7 @@
 # Prerequisites:
 #   curl, jq (recommended)
 #   All services running (or `docker-compose up -d --build`)
+#   Keycloak reachable with realm/client/user configured (see below)
 # =============================================================================
 
 set -euo pipefail
@@ -24,8 +25,17 @@ NOTIFICATION_URL="${NOTIFICATION_URL:-http://localhost:8083}"
 USER_URL="${USER_URL:-http://localhost:8082}"
 DISCOVERY_URL="${DISCOVERY_URL:-http://localhost:8761}"
 
+# Keycloak: gateway requests require a bearer token issued by the ims realm.
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://homelab:18080}"
+KEYCLOAK_REALM="${KEYCLOAK_REALM:-ims}"
+KEYCLOAK_CLIENT="${KEYCLOAK_CLIENT:-ims-frontend}"
+SMOKE_USER="${SMOKE_USER:-agente1}"
+SMOKE_PASSWORD="${SMOKE_PASSWORD:-agente1234}"
+
 TIMEOUT_SEC="${TIMEOUT_SEC:-120}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
+
+ACCESS_TOKEN=""
 
 # ---- Colors -----------------------------------------------------------------
 RED='\033[0;31m'
@@ -69,6 +79,34 @@ check_curl() {
     fi
 }
 
+# Requests an access token via the OAuth2 password grant (direct access
+# grants are enabled on the public ims-frontend client). Sets ACCESS_TOKEN.
+fetch_token() {
+    info "Requesting token from ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM} as ${SMOKE_USER} ..."
+    local token_response
+    token_response=$(curl -sf "${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token" \
+        -d grant_type=password \
+        -d client_id="${KEYCLOAK_CLIENT}" \
+        -d username="${SMOKE_USER}" \
+        -d password="${SMOKE_PASSWORD}" 2>&1) || token_response=""
+
+    if [ "$HAS_JQ" = true ]; then
+        ACCESS_TOKEN=$(echo "$token_response" | jq -r '.access_token // empty' 2>/dev/null)
+    else
+        ACCESS_TOKEN=$(echo "$token_response" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+    fi
+
+    if [ -z "$ACCESS_TOKEN" ]; then
+        fail "Could not obtain an access token — check Keycloak URL, realm, client and user"
+        return 1
+    fi
+    pass "Access token obtained for ${SMOKE_USER}"
+}
+
+auth_header() {
+    printf 'Authorization: Bearer %s' "$ACCESS_TOKEN"
+}
+
 wait_for_service() {
     local name="$1"
     local url="$2"
@@ -99,7 +137,8 @@ wait_for_notification() {
     info "Polling notifications for user ${user_id} ..."
     while [ $attempt -lt "$max_attempts" ]; do
         local response
-        response=$(curl -sf "${GATEWAY_URL}/api/notifications?userId=${user_id}" 2>&1) || response=""
+        response=$(curl -sf "${GATEWAY_URL}/api/notifications?userId=${user_id}" \
+            -H "$(auth_header)" 2>&1) || response=""
 
         if [ -n "$response" ]; then
             if [ "$HAS_JQ" = true ]; then
@@ -143,6 +182,12 @@ main() {
     wait_for_service "Notification Service" "${NOTIFICATION_URL}"
     wait_for_service "User Service"       "${USER_URL}"
 
+    # ---- Phase 1.5: Authentication ------------------------------------------
+    echo ""
+    echo "── Phase 1.5: Authentication (Keycloak) ────────────────────────────"
+
+    fetch_token
+
     # ---- Phase 2: Create Incident ------------------------------------------
     echo ""
     echo "── Phase 2: Create Incident ────────────────────────────────────────"
@@ -158,6 +203,7 @@ main() {
     local create_response
     create_response=$(curl -sf -X POST "${GATEWAY_URL}/api/incidents" \
         -H "Content-Type: application/json" \
+        -H "$(auth_header)" \
         -d "$create_payload" 2>&1) || {
         fail "Create incident failed (API Gateway) — trying direct incident-service"
         create_response=$(curl -sf -X POST "${INCIDENT_URL}/api/incidents" \
@@ -187,7 +233,7 @@ main() {
     echo "── Phase 3: Retrieve Incident ──────────────────────────────────────"
 
     info "GET /api/incidents/${incident_id}"
-    if curl -sf "${GATEWAY_URL}/api/incidents/${incident_id}" -o /dev/null 2>&1; then
+    if curl -sf "${GATEWAY_URL}/api/incidents/${incident_id}" -H "$(auth_header)" -o /dev/null 2>&1; then
         pass "Retrieved incident ${incident_id}"
     else
         if curl -sf "${INCIDENT_URL}/api/incidents/${incident_id}" -o /dev/null 2>&1; then
@@ -202,7 +248,7 @@ main() {
     echo "── Phase 4: List Incidents ─────────────────────────────────────────"
 
     info "GET /api/incidents"
-    if curl -sf "${GATEWAY_URL}/api/incidents" -o /dev/null 2>&1; then
+    if curl -sf "${GATEWAY_URL}/api/incidents" -H "$(auth_header)" -o /dev/null 2>&1; then
         pass "Listed incidents"
     else
         if curl -sf "${INCIDENT_URL}/api/incidents" -o /dev/null 2>&1; then
@@ -218,7 +264,7 @@ main() {
 
     info "GET /api/users"
     local users_response
-    users_response=$(curl -sf "${GATEWAY_URL}/api/users" 2>&1) || {
+    users_response=$(curl -sf "${GATEWAY_URL}/api/users" -H "$(auth_header)" 2>&1) || {
         users_response=$(curl -sf "${USER_URL}/api/users" 2>&1) || {
             users_response=""
         }
@@ -241,6 +287,7 @@ main() {
         info "PUT /api/incidents/${incident_id}/assign"
         if curl -sf -X PUT "${GATEWAY_URL}/api/incidents/${incident_id}/assign" \
                 -H "Content-Type: application/json" \
+                -H "$(auth_header)" \
                 -d "{\"assigneeId\":\"${assignee_id}\"}" -o /dev/null 2>&1; then
             pass "Incident assigned to ${assignee_id}"
         else
@@ -256,6 +303,7 @@ main() {
         info "PUT /api/incidents/${incident_id}/transition → IN_PROGRESS"
         if curl -sf -X PUT "${GATEWAY_URL}/api/incidents/${incident_id}/transition" \
                 -H "Content-Type: application/json" \
+                -H "$(auth_header)" \
                 -d '{"newStatus":"IN_PROGRESS"}' -o /dev/null 2>&1; then
             pass "Incident transitioned to IN_PROGRESS"
         else
@@ -276,7 +324,7 @@ main() {
     echo "── Phase 6: User Service Listing ───────────────────────────────────"
 
     info "GET /api/users"
-    if curl -sf "${GATEWAY_URL}/api/users" -o /dev/null 2>&1; then
+    if curl -sf "${GATEWAY_URL}/api/users" -H "$(auth_header)" -o /dev/null 2>&1; then
         pass "User service listing available"
     else
         if curl -sf "${USER_URL}/api/users" -o /dev/null 2>&1; then
