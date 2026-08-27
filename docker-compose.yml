@@ -49,6 +49,26 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.2
+    container_name: ims-keycloak
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "18080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_ADMIN: http://localhost:18080
+    volumes:
+      - ./keycloak/import/ims-realm.json:/opt/keycloak/data/import/ims-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/ims/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -c 64 <&3 | grep -q '200'; exec 3>&- 2>/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   # ── Discovery & Config ─────────────────────────────────────────
 
   discovery-service:
@@ -110,9 +130,14 @@ services:
     depends_on:
       config-server:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
+      SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED: "true"
+      SPRING_CLOUD_CONFIG_DISCOVERY_SERVICE_ID: config-server
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
       DISCOVERY_HOST: discovery-service
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/ims
 
   incident-service:
     build:
@@ -131,6 +156,8 @@ services:
       config-server:
         condition: service_healthy
     environment:
+      SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED: "true"
+      SPRING_CLOUD_CONFIG_DISCOVERY_SERVICE_ID: config-server
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/incident_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -154,6 +181,8 @@ services:
       config-server:
         condition: service_healthy
     environment:
+      SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED: "true"
+      SPRING_CLOUD_CONFIG_DISCOVERY_SERVICE_ID: config-server
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/notification_db
       SPRING_RABBITMQ_HOST: rabbitmq
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
@@ -173,6 +202,8 @@ services:
       config-server:
         condition: service_healthy
     environment:
+      SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED: "true"
+      SPRING_CLOUD_CONFIG_DISCOVERY_SERVICE_ID: config-server
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}

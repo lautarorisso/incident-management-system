@@ -2,7 +2,7 @@
 
 Microservices-based incident management system built with Spring Boot 3.5, Spring Cloud 2025, and Java 21.
 
-> **Note**: This is a work-in-progress MVP for portfolio demonstration. JWT validation via Keycloak is planned but not yet fully implemented.
+> **Note**: This is a work-in-progress MVP for portfolio demonstration. It runs fully containerized with Keycloak authentication (realm, users and roles are provisioned automatically).
 
 ## Architecture
 
@@ -44,7 +44,7 @@ All domain services use a **layered architecture** (controller → service → r
 
 | Service | Port | Description |
 |---------|------|-------------|
-| api-gateway | 8080 | Routing, rate limiting, circuit breakers, request logging (JWT validation pending Keycloak) |
+| api-gateway | 8080 | Routing, rate limiting, circuit breakers, request logging, JWT validation (Keycloak) |
 | config-server | 8888 | Spring Cloud Config Server — central configuration for all services |
 | discovery-service | 8761 | Eureka Service Discovery Server |
 | incident-service | 8081 | Incident CRUD, state machine, outbox pattern, RabbitMQ events |
@@ -142,7 +142,9 @@ bearer token issued by a Keycloak `ims` realm. Realm roles map to authorities as
 `ims-admin → ROLE_ADMIN`, `ims-agent → ROLE_AGENT`, `ims-user → ROLE_USER`.
 
 > **Note**: JWT validation is configured via Config Server (`KEYCLOAK_ISSUER_URI`).
-> For local development without Keycloak, the gateway permits all requests.
+> In the Docker stack, Keycloak is provisioned automatically (realm, client,
+> roles and seed users) and the issuer URI points at the internal `keycloak`
+> host.
 
 | Route | Required roles |
 |-------|----------------|
@@ -162,6 +164,14 @@ curl -s http://localhost:18080/realms/ims/protocol/openid-connect/token \
 # then call the API through the gateway
 curl -s http://localhost:8080/api/users -H "Authorization: Bearer $TOKEN"
 ```
+
+Seed users provisioned in the `ims` realm (re-created on a fresh `docker compose up -d --build`):
+
+| Username | Password | Realm role |
+|----------|----------|------------|
+| `agente1` | `agente1234` | `ims-agent` |
+| `lautaro` | `admin1234` | `ims-admin` |
+| `usuario1` | `usuario1234` | `ims-user` |
 
 Smoke test auth knobs (all optional): `KEYCLOAK_URL`, `KEYCLOAK_REALM`,
 `KEYCLOAK_CLIENT`, `SMOKE_USER`, `SMOKE_PASSWORD`.
@@ -245,9 +255,9 @@ builds it from this submodule via `docker/config-server.Dockerfile`.
 - `CorrelationIdFilter` (order -100) — injects `X-Correlation-Id`
 - `RequestLoggingFilter` (order -90) — logs method/path/status/duration
 - `RateLimitFilter` (order -80) — token bucket per client IP
-- `UserIdHeaderFilter` (order -60) — JWT `sub` → `X-User-Id` (pending Keycloak)
+- `UserIdHeaderFilter` (order -60) — JWT `sub` → `X-User-Id` (maps Keycloak user id to the user-service record)
 
-> **Note**: JWT validation is disabled until Keycloak is deployed. The gateway currently permits all requests for local development.
+Slim test coverage is pending (see project structure).
 
 ---
 
@@ -373,6 +383,7 @@ builds it from this submodule via `docker/config-server.Dockerfile`.
 | http://localhost:8761 | Eureka Dashboard |
 | http://localhost:8888 | Config Server Health |
 | http://localhost:15672 | RabbitMQ Management UI |
+| http://localhost:18080 | Keycloak Admin Console (realm `ims` → admin/admin) |
 | http://localhost:8081/scalar | Incident Service API Docs |
 | http://localhost:8083/scalar | Notification Service API Docs |
 | http://localhost:8082/scalar | User Service API Docs |
@@ -384,7 +395,8 @@ builds it from this submodule via `docker/config-server.Dockerfile`.
 |-----------|---------|---------------|---------|-----|
 | PostgreSQL | 16 | `postgres` | 5432 | — |
 | MongoDB | 7 | `mongo` | 27017 | — |
-| RabbitMQ | 3-management | `rabbitmq` | 5672, 15672 | http://localhost:15672 |
+| RabbitMQ | 3-management | `rabbitmq` | 5672, 15672 | http://localhost:15672 (guest/guest) |
+| Keycloak | 26 | `keycloak` | 18080 | http://localhost:18080 (admin/admin) |
 
 ## Environment Variables
 

@@ -1,0 +1,69 @@
+{
+  "realm": "ims",
+  "enabled": true,
+  "displayName": "Incident Management System",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      { "name": "ims-admin", "description": "Administrator" },
+      { "name": "ims-agent", "description": "Support agent" },
+      { "name": "ims-user", "description": "Regular user" }
+    ]
+  },
+  "groups": [],
+  "clients": [
+    {
+      "clientId": "ims-frontend",
+      "name": "IMS Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://localhost:18080/*"],
+      "webOrigins": ["+"]
+    }
+  ],
+  "users": [
+    {
+      "id": "9f6a2d1e-0000-4000-8000-000000000001",
+      "username": "agente1",
+      "enabled": true,
+      "firstName": "Agente",
+      "lastName": "Uno",
+      "email": "agente1@ims.local",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "agente1234", "temporary": false }
+      ],
+      "realmRoles": ["ims-agent"]
+    },
+    {
+      "username": "lautaro",
+      "enabled": true,
+      "firstName": "Lautaro",
+      "lastName": "Risso",
+      "email": "lautarorisso77@gmail.com",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "admin1234", "temporary": false }
+      ],
+      "realmRoles": ["ims-admin"]
+    },
+    {
+      "username": "usuario1",
+      "enabled": true,
+      "firstName": "Usuario",
+      "lastName": "Uno",
+      "email": "usuario1@ims.local",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "usuario1234", "temporary": false }
+      ],
+      "realmRoles": ["ims-user"]
+    }
+  ]
+}

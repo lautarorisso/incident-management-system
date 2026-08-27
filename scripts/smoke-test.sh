@@ -26,7 +26,7 @@ USER_URL="${USER_URL:-http://localhost:8082}"
 DISCOVERY_URL="${DISCOVERY_URL:-http://localhost:8761}"
 
 # Keycloak: gateway requests require a bearer token issued by the ims realm.
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://homelab:18080}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:18080}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-ims}"
 KEYCLOAK_CLIENT="${KEYCLOAK_CLIENT:-ims-frontend}"
 SMOKE_USER="${SMOKE_USER:-agente1}"
