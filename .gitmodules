@@ -1,0 +1,3 @@
+[submodule "services/config-server"]
+	path = services/config-server
+	url = git@github.com:lautarorisso/config-server.git

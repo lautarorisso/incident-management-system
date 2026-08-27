@@ -21,7 +21,6 @@
 
     <modules>
         <module>services/shared</module>
-        <module>services/config-server</module>
         <module>services/api-gateway</module>
         <module>services/discovery-service</module>
         <module>services/incident-service</module>

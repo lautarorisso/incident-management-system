@@ -65,11 +65,15 @@ All domain services use a **layered architecture** (controller → service → r
 
 ## Quick Start
 
+`config-server` is a git submodule (see [Config Server](#config-server)), so clone it recursively:
+
 ```bash
-git clone <repo-url>
+git clone --recursive <repo-url>
 cd incident-management-system
 docker compose up -d --build
 ```
+
+> Already cloned without `--recursive`? Run `git submodule update --init --recursive`.
 
 This builds and starts all 9 containers (3 infra + 6 services). Wait ~60 seconds for all services to register in Eureka, then:
 
@@ -93,13 +97,15 @@ Run all tests from the project root:
 Run tests for a specific service:
 
 ```bash
-./mvnw test -pl services/config-server
 ./mvnw test -pl services/incident-service
 ./mvnw test -pl services/notification-service
 ./mvnw test -pl services/user-service
 ./mvnw test -pl services/api-gateway
 ./mvnw test -pl services/discovery-service
 ```
+
+> `config-server` is no longer a module of this reactor — it is a git submodule.
+> Test it from inside the submodule: `cd services/config-server && ./mvnw test`.
 
 Run a specific test class:
 
@@ -183,20 +189,25 @@ Smoke test auth knobs (all optional): `KEYCLOAK_URL`, `KEYCLOAK_REALM`,
 
 ### config-server
 
+`services/config-server` is a **git submodule** pointing at
+[`lautarorisso/config-server`](https://github.com/lautarorisso/config-server) —
+a standalone Spring Boot project that owns its configuration. `docker compose`
+builds it from this submodule via `docker/config-server.Dockerfile`.
+
 | Attribute | Value |
 |-----------|-------|
 | Port | 8888 |
-| Package | `services/config-server` |
+| Package | `services/config-server` (git submodule) |
 | Role | Spring Cloud Config Server — serves centralized configuration to all services |
 | Dependencies | `discovery-service` |
-| Test command | `./mvnw test -pl services/config-server` |
-| Start command | `./mvnw spring-boot:run -pl services/config-server` |
+| Test command | `cd services/config-server && ./mvnw test` |
+| Start command | `cd services/config-server && ./mvnw spring-boot:run` |
 | Health endpoint | http://localhost:8888/actuator/health |
 
 **Key config** (`application.properties`):
 - `spring.profiles.active=native` — reads YAML files from filesystem
 - `spring.cloud.config.server.native.search-locations=file:${CONFIG_DIR:./}` — config directory
-- Config files live in `services/config-server/config/`
+- Config files live at the **root of the submodule** (`CONFIG_DIR=/app` in Docker)
 
 **Config files** (served to other services):
 | File | Service | Key settings |
@@ -388,7 +399,7 @@ RABBITMQ_PASS=guest
 
 ## Configuration
 
-Services use `spring.config.import: "optional:configserver:"` with Eureka discovery to pull configuration from the Config Server. When the Config Server is available (Docker Compose), services receive centralized config from `services/config-server/config/*.yaml`.
+Services use `spring.config.import: "optional:configserver:"` with Eureka discovery to pull configuration from the Config Server. When the Config Server is available (Docker Compose), services receive centralized config from the YAML files at the root of the `services/config-server` submodule.
 
 Environment variables in `docker-compose.yml` override Config Server values (Spring precedence: env var > config server > local `application.yaml`).
 
@@ -397,17 +408,18 @@ Environment variables in `docker-compose.yml` override Config Server values (Spr
 ```
 incident-management-system/
 ├── docker-compose.yml          # Full local stack (clone & run)
-├── Dockerfile                  # Multi-stage build for all services
+├── Dockerfile                  # Multi-stage build for domain services
+├── docker/
+│   └── config-server.Dockerfile# Config Server build (from submodule)
 ├── .dockerignore               # Keeps build context lean
+├── .gitmodules                 # Config Server submodule pointer
 ├── pom.xml                     # Parent Maven POM (multi-module)
 ├── mvnw                        # Maven wrapper
 ├── scripts/
 │   ├── init-db.sql             # Database initialization
 │   └── smoke-test.sh           # End-to-end smoke test
 └── services/
-    ├── config-server/          # Spring Cloud Config Server
-    │   ├── config/             # YAML configs served to other services
-    │   └── Dockerfile          # Config Server Docker build
+    ├── config-server/          # git submodule → Spring Cloud Config Server
     ├── api-gateway/            # Spring Cloud Gateway
     ├── discovery-service/      # Eureka Service Registry
     ├── incident-service/       # Incident domain (layered)

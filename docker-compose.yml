@@ -70,13 +70,15 @@ services:
   config-server:
     build:
       context: .
-      dockerfile: services/config-server/Dockerfile
+      dockerfile: docker/config-server.Dockerfile
+      args:
+        MODULE_DIR: services/config-server
     container_name: ims-config-server
     ports:
       - "8888:8888"
     environment:
       EUREKA_URI: http://discovery-service:8761/eureka/
-      CONFIG_DIR: /config
+      CONFIG_DIR: /app
       POSTGRES_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
