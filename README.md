@@ -68,7 +68,7 @@ All domain services use a **layered architecture** (controller → service → r
 `config-server` is a git submodule (see [Config Server](#config-server)), so clone it recursively:
 
 ```bash
-git clone --recursive <repo-url>
+git clone --recursive [<repo-url>](https://github.com/lautarorisso/incident-management-system)
 cd incident-management-system
 docker compose up -d --build
 ```
