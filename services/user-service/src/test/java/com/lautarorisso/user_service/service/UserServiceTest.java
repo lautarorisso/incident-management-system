@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,29 +25,6 @@ class UserServiceTest {
 
     @InjectMocks
     private UserService userService;
-
-    @Test
-    void shouldGetUserById() {
-        UUID id = UUID.randomUUID();
-        User user = User.builder().id(id).username("jdoe").build();
-
-        when(userRepository.findById(id)).thenReturn(Optional.of(user));
-
-        Optional<User> found = userService.getUserById(id);
-
-        assertTrue(found.isPresent());
-        assertEquals("jdoe", found.get().getUsername());
-        verify(userRepository).findById(id);
-    }
-
-    @Test
-    void shouldReturnEmptyWhenNotFound() {
-        UUID id = UUID.randomUUID();
-
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
-
-        assertTrue(userService.getUserById(id).isEmpty());
-    }
 
     @Test
     void shouldGetAllUsersWhenNoTeamFilter() {

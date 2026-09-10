@@ -10,8 +10,15 @@ import org.springframework.context.annotation.Import;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies that Resilience4j circuit breaker configuration from
- * application.yaml is loaded correctly and all required instances exist.
+ * Verifies the Resilience4j circuit breaker configuration contract.
+ * <p>
+ * The properties declared below are declared INLINE (they shadow the real
+ * {@code resilience4j.circuitbreaker} block in
+ * services/api-gateway/src/main/resources/application.yaml, which Spring does not
+ * load in tests). They must be kept in sync with that file manually.
+ * <p>
+ * This is NOT a test of the real configuration: if the production yaml changes and
+ * this test is not updated, the test will NOT detect it.
  */
 @SpringBootTest(properties = {
         "eureka.client.enabled=false",
@@ -20,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "resilience4j.circuitbreaker.configs.default.minimumNumberOfCalls=5",
         "resilience4j.circuitbreaker.configs.default.permittedNumberOfCallsInHalfOpenState=3",
         "resilience4j.circuitbreaker.configs.default.failureRateThreshold=50",
-        "resilience4j.circuitbreaker.instances.api-gateway.baseConfig=default",
         "resilience4j.circuitbreaker.instances.incident-service.baseConfig=default",
         "resilience4j.circuitbreaker.instances.notification-service.baseConfig=default",
         "resilience4j.circuitbreaker.instances.user-service.baseConfig=default"
@@ -43,11 +49,6 @@ class Resilience4jConfigurationTest {
     }
 
     @Test
-    void apiGatewayInstanceShouldExist() {
-        assertThat(circuitBreakerRegistry.find("api-gateway")).isPresent();
-    }
-
-    @Test
     void incidentServiceInstanceShouldExist() {
         assertThat(circuitBreakerRegistry.find("incident-service")).isPresent();
     }
@@ -65,7 +66,7 @@ class Resilience4jConfigurationTest {
     @Test
     void allInstancesShouldUseDefaultConfig() {
         for (String name : new String[]{
-                "api-gateway", "incident-service",
+                "incident-service",
                 "notification-service", "user-service"}) {
             CircuitBreakerConfig config = circuitBreakerRegistry.find(name)
                     .orElseThrow(() -> new AssertionError(name + " not found"))

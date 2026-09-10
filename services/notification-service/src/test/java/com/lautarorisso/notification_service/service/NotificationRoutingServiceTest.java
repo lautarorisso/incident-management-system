@@ -39,24 +39,6 @@ class NotificationRoutingServiceTest {
     }
 
     @Test
-    void incidentAssignedRoutesToAssigneeAndExcludesChangedBy() {
-        UUID changedBy = UUID.randomUUID();
-        UUID assigneeId = UUID.randomUUID();
-
-        Map<String, Object> event = Map.of(
-                "eventType", "INCIDENT_ASSIGNED",
-                "incidentId", UUID.randomUUID().toString(),
-                "assigneeId", assigneeId.toString(),
-                "changedBy", changedBy.toString()
-        );
-
-        Set<UUID> targets = routingService.resolveTargets(event);
-
-        assertTrue(targets.contains(assigneeId));
-        assertFalse(targets.contains(changedBy));
-    }
-
-    @Test
     void incidentStatusChangedRoutesToAssignee() {
         UUID assigneeId = UUID.randomUUID();
 

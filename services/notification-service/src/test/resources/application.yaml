@@ -3,13 +3,11 @@
 spring:
   config:
     import: "optional:configserver:"
+  rabbitmq:
+    host: localhost
+    port: 5672
 
 # Disable Eureka client for tests
 eureka:
   client:
     enabled: false
-
-# Disable RabbitMQ for tests
-  rabbitmq:
-    host: localhost
-    port: 5672
