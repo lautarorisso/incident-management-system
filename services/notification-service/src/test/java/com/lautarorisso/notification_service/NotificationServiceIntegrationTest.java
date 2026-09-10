@@ -5,6 +5,7 @@ import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.messaging.IncidentEventListener;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
+import com.lautarorisso.notification_service.support.AbstractMongoTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class NotificationServiceIntegrationTest {
+class NotificationServiceIntegrationTest extends AbstractMongoTestBase {
 
     @Autowired
     private IncidentEventListener eventListener;

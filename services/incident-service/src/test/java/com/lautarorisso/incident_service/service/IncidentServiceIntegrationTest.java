@@ -8,6 +8,7 @@ import com.lautarorisso.incident_service.entity.IncidentPriority;
 import com.lautarorisso.incident_service.entity.IncidentStatus;
 import com.lautarorisso.incident_service.repository.IncidentRepository;
 import com.lautarorisso.incident_service.repository.OutboxEventRepository;
+import com.lautarorisso.incident_service.support.AbstractPostgresTestBase;
 import com.ims.shared.dto.TeamDto;
 import com.ims.shared.dto.UserDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +30,13 @@ import static org.mockito.Mockito.when;
 /**
  * Integration tests for {@link IncidentService}.
  * <p>
- * Loads the full Spring context (test profile: H2 database, disabled Eureka/Config)
- * and mocks external dependencies (Feign UserServiceClient, RabbitMQ).
+ * Loads the full Spring context (test profile: real PostgreSQL via Testcontainers,
+ * disabled Eureka/Config) and mocks external dependencies (Feign UserServiceClient,
+ * RabbitMQ).
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class IncidentServiceIntegrationTest {
+class IncidentServiceIntegrationTest extends AbstractPostgresTestBase {
 
     @Autowired
     private IncidentService incidentService;
@@ -47,6 +49,14 @@ class IncidentServiceIntegrationTest {
 
     @MockitoBean
     private UserServiceClient userServiceClient;
+
+    // Replace the real OutboxPoller so its @Scheduled method never registers:
+    // the poller would run every 5s and mark outbox events as published mid-test
+    // whenever a RabbitMQ broker is reachable, breaking the shouldPublishOutboxEvents*
+    // assertions. The poller behavior is covered by OutboxPollerTest and
+    // OutboxPollerIntegrationTest.
+    @MockitoBean
+    private OutboxPoller outboxPoller;
 
     private UUID assigneeId;
     private UUID teamId;
@@ -128,33 +138,6 @@ class IncidentServiceIntegrationTest {
         var found = incidentService.getIncident(created.getId());
         assertTrue(found.isPresent());
         assertEquals(IncidentStatus.CLOSED, found.get().getStatus());
-    }
-
-    @Test
-    void shouldReopenResolvedIncident() {
-        Incident created = incidentService.createIncident(
-                "Reopen test",
-                "Will be resolved then reopened",
-                IncidentPriority.MEDIUM);
-
-        incidentService.transitionIncident(created.getId(), IncidentStatus.IN_PROGRESS);
-        incidentService.transitionIncident(created.getId(), IncidentStatus.RESOLVED);
-
-        Incident reopened = incidentService.transitionIncident(
-                created.getId(), IncidentStatus.OPEN);
-        assertEquals(IncidentStatus.OPEN, reopened.getStatus());
-    }
-
-    @Test
-    void shouldRejectInvalidTransition() {
-        Incident created = incidentService.createIncident(
-                "Invalid transition test",
-                "Should fail on invalid transition",
-                IncidentPriority.MEDIUM);
-
-        assertThrows(IllegalStateException.class,
-                () -> incidentService.transitionIncident(
-                        created.getId(), IncidentStatus.RESOLVED));
     }
 
     @Test

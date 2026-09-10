@@ -2,6 +2,7 @@ package com.lautarorisso.incident_service.client;
 
 import com.ims.shared.dto.TeamDto;
 import com.ims.shared.dto.UserDto;
+import com.lautarorisso.incident_service.support.AbstractPostgresTestBase;
 import feign.FeignException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -35,7 +36,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
         "spring.cloud.config.enabled=false"
 })
 @ActiveProfiles("test")
-class UserServiceClientWireMockTest {
+class UserServiceClientWireMockTest extends AbstractPostgresTestBase {
 
     @RegisterExtension
     static WireMockExtension wiremock = WireMockExtension.newInstance()

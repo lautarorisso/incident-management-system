@@ -4,6 +4,7 @@ import com.lautarorisso.notification_service.entity.Notification;
 import com.lautarorisso.notification_service.entity.NotificationStatus;
 import com.lautarorisso.notification_service.entity.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
+import com.lautarorisso.notification_service.support.AbstractMongoTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DataMongoTest
 @ActiveProfiles("test")
-class NotificationRepositoryTest {
+class NotificationRepositoryTest extends AbstractMongoTestBase {
 
     @Autowired
     private NotificationRepository notificationRepository;

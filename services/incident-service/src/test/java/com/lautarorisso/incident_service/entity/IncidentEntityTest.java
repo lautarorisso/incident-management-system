@@ -2,8 +2,11 @@ package com.lautarorisso.incident_service.entity;
 
 import com.lautarorisso.incident_service.repository.IncidentRepository;
 import com.lautarorisso.incident_service.repository.OutboxEventRepository;
+import com.lautarorisso.incident_service.support.AbstractPostgresTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -17,14 +20,23 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for JPA entity mapping and basic persistence operations.
  */
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-class IncidentEntityTest {
+class IncidentEntityTest extends AbstractPostgresTestBase {
 
     @Autowired
     private IncidentRepository incidentRepo;
 
     @Autowired
     private OutboxEventRepository outboxRepo;
+
+    @BeforeEach
+    void setUp() {
+        // Clear the V6__seed_data rows so count-based assertions only see the
+        // incidents created by each test. The transaction rolls back afterwards,
+        // leaving the seed intact for the next run.
+        incidentRepo.deleteAll();
+    }
 
     @Test
     void shouldSaveAndFindIncidentEntity() {

@@ -3,8 +3,11 @@ package com.lautarorisso.incident_service.repository;
 import com.lautarorisso.incident_service.entity.Incident;
 import com.lautarorisso.incident_service.entity.IncidentPriority;
 import com.lautarorisso.incident_service.entity.IncidentStatus;
+import com.lautarorisso.incident_service.support.AbstractPostgresTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,11 +25,20 @@ import static org.junit.jupiter.api.Assertions.*;
  * combined filters.
  */
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-class IncidentRepositoryTest {
+class IncidentRepositoryTest extends AbstractPostgresTestBase {
 
     @Autowired
     private IncidentRepository incidentRepo;
+
+    @BeforeEach
+    void setUp() {
+        // Clear the V6__seed_data rows so count-based assertions only see the
+        // incidents created by each test. The transaction rolls back afterwards,
+        // leaving the seed intact for the next run.
+        incidentRepo.deleteAll();
+    }
 
     @Test
     void shouldFindByStatusAndPriority() {

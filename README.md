@@ -88,6 +88,8 @@ This builds and starts all 9 containers (3 infra + 6 services). Wait ~60 seconds
 
 Tests require Java 21 and Maven locally (Docker builds don't run tests).
 
+The user-service and incident-service tests use Testcontainers with a real PostgreSQL 16 container, so Docker must be running.
+
 Run all tests from the project root:
 
 ```bash
