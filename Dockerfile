@@ -15,6 +15,9 @@ COPY services/api-gateway/pom.xml services/api-gateway/pom.xml
 COPY services/incident-service/pom.xml services/incident-service/pom.xml
 COPY services/notification-service/pom.xml services/notification-service/pom.xml
 COPY services/user-service/pom.xml services/user-service/pom.xml
+# e2e-tests is part of the root reactor (compiled only in the fast suite),
+# so Maven needs its pom present to load the aggregator model.
+COPY e2e-tests/pom.xml e2e-tests/pom.xml
 RUN mvn -pl services/$SERVICE -am dependency:go-offline -B
 COPY . .
 RUN mvn -pl services/$SERVICE -am package -DskipTests -B

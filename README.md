@@ -178,6 +178,48 @@ Seed users provisioned in the `ims` realm (re-created on a fresh `docker compose
 Smoke test auth knobs (all optional): `KEYCLOAK_URL`, `KEYCLOAK_REALM`,
 `KEYCLOAK_CLIENT`, `SMOKE_USER`, `SMOKE_PASSWORD`.
 
+## E2E Tests (REST Assured)
+
+The repo ships a black-box E2E module (`e2e-tests/`) that drives the real
+docker-compose stack over HTTP with REST Assured — no Spring context, no
+project artifacts, no container internals. It is the formalized replacement
+for the fragile manual paths of `scripts/smoke-test.sh`, with hard assertions
+(status codes + response bodies) instead of curl + sed UUID fallbacks.
+
+Run the full cycle with:
+
+```bash
+./scripts/e2e-test.sh
+```
+
+The launcher:
+1. Brings up the stack: `docker compose up -d --build` (idempotent — no-op if already up)
+2. Waits until all 5 services report `/actuator/health` (bounded ~180s, 5s interval)
+3. Runs the suite: `./mvnw -pl e2e-tests test -DskipE2E=false`
+4. Leaves the stack running so `./scripts/smoke-test.sh` still works after (tear down with `docker compose down`)
+
+The module participates in the reactor but **never runs in the fast suite**:
+surefire is gated by the `skipE2E` property (default `true`), so
+`./scripts/test.sh test` compiles it and executes zero E2E tests. Suite only
+(stack must already be up):
+
+```bash
+./mvnw -pl e2e-tests test -DskipE2E=false
+```
+
+Tests:
+
+| Class | Asserts |
+|-------|---------|
+| `AuthE2E` | Keycloak password grant returns 200 + non-empty `access_token` |
+| `HealthE2E` | `/actuator/health` returns 200 + `status: UP` for the 5 services |
+| `IncidentFlowE2E` | create incident (unique title) → retrieve (OPEN) → appears in list → assign to first real user → transition to `IN_PROGRESS` → poll notifications until the assignee has ≥1 (60s bound, 2s interval) |
+
+Config surface (all optional; same defaults as `docker-compose.yml` and the
+smoke test): `GATEWAY_URL`, `INCIDENT_URL`, `NOTIFICATION_URL`, `USER_URL`,
+`DISCOVERY_URL`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT`,
+`E2E_USER`, `E2E_PASSWORD`.
+
 ## Per-Service Reference
 
 ### discovery-service
@@ -429,7 +471,9 @@ incident-management-system/
 ├── .gitmodules                 # Config Server submodule pointer
 ├── pom.xml                     # Parent Maven POM (multi-module)
 ├── mvnw                        # Maven wrapper
+├── e2e-tests/                  # Black-box E2E suite (REST Assured, gated by skipE2E)
 ├── scripts/
+│   ├── e2e-test.sh             # E2E runner: stack up + health gates + suite
 │   ├── init-db.sql             # Database initialization
 │   └── smoke-test.sh           # End-to-end smoke test
 └── services/

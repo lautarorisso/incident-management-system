@@ -26,6 +26,9 @@
         <module>services/incident-service</module>
         <module>services/notification-service</module>
         <module>services/user-service</module>
+        <!-- Black-box E2E suite: compiled in the fast reactor, tests gated by
+             the skipE2E property (see e2e-tests/pom.xml). -->
+        <module>e2e-tests</module>
     </modules>
 
     <properties>
