@@ -125,6 +125,7 @@ services:
       args:
         SERVICE: api-gateway
     container_name: ims-gateway
+    restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
@@ -136,6 +137,7 @@ services:
       SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED: "true"
       SPRING_CLOUD_CONFIG_DISCOVERY_SERVICE_ID: config-server
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
       DISCOVERY_HOST: discovery-service
       KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/ims
 
@@ -146,6 +148,7 @@ services:
       args:
         SERVICE: incident-service
     container_name: ims-incident
+    restart: unless-stopped
     ports:
       - "8081:8081"
     depends_on:
@@ -163,6 +166,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       SPRING_RABBITMQ_HOST: rabbitmq
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: incident-service
 
   notification-service:
     build:
@@ -171,6 +175,7 @@ services:
       args:
         SERVICE: notification-service
     container_name: ims-notification
+    restart: unless-stopped
     ports:
       - "8083:8083"
     depends_on:
@@ -186,6 +191,7 @@ services:
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/notification_db
       SPRING_RABBITMQ_HOST: rabbitmq
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: notification-service
 
   user-service:
     build:
@@ -194,6 +200,7 @@ services:
       args:
         SERVICE: user-service
     container_name: ims-user
+    restart: unless-stopped
     ports:
       - "8082:8082"
     depends_on:
@@ -208,6 +215,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: user-service
 
 volumes:
   postgres_data:
