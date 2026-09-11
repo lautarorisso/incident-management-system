@@ -39,6 +39,16 @@ class GlobalExceptionHandlerFeignTest {
             throw feignException(404, "User not found");
         }
 
+        @GetMapping("/test/feign-401")
+        void throwFeign401() {
+            throw feignException(401, "Unauthorized");
+        }
+
+        @GetMapping("/test/feign-403")
+        void throwFeign403() {
+            throw feignException(403, "Forbidden");
+        }
+
         @GetMapping("/test/feign-5xx")
         void throwFeign5xx() {
             throw feignException(500, "Internal Server Error\n<html>...</html>");
@@ -74,6 +84,22 @@ class GlobalExceptionHandlerFeignTest {
         mockMvc.perform(get("/test/feign-4xx"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").isNotEmpty());
+    }
+
+    @Test
+    void shouldPropagateFeign401As401() throws Exception {
+        mockMvc.perform(get("/test/feign-401"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.detail").isNotEmpty());
+    }
+
+    @Test
+    void shouldPropagateFeign403As403() throws Exception {
+        mockMvc.perform(get("/test/feign-403"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.detail").isNotEmpty());
     }
 

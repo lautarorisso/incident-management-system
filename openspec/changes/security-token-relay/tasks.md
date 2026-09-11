@@ -44,10 +44,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Integration / Wiring
 
-- [ ] 3.1 Modify `services/incident-service/pom.xml` — add security starters
-- [ ] 3.2 Create `incident-service/.../config/SecurityConfig.java` — `@Import` + incident matrix
-- [ ] 3.3 Modify `UserServiceClient.java` — add `FeignTokenRelayConfig.class`
-- [ ] 3.4 Modify `GlobalExceptionHandler.java` — propagate 401/403 before enabling JWT
+- [x] 3.1 Modify `services/incident-service/pom.xml` — add security starters (resolved: starters transitives via shared per design; pom adds `spring-security-test` test scope)
+- [x] 3.2 Create `incident-service/.../config/SecurityConfig.java` — `@Import` + incident matrix
+- [x] 3.3 Modify `UserServiceClient.java` — add `FeignTokenRelayConfig.class`
+- [x] 3.4 Modify `GlobalExceptionHandler.java` — propagate 401/403 before enabling JWT
 
 ## Phase 4: Gateway Cleanup
 
@@ -62,9 +62,9 @@ Chain strategy: stacked-to-main
 
 ## Phase 6: Testing
 
-- [ ] 6.1 Update `@SpringBootTest` controller tests — add `@WithJwt`/`@WithMockUser`
-- [ ] 6.2 Update `UserServiceClientWireMockTest` — assert `Authorization` forwarded
-- [ ] 6.3 Create auth matrix tests (`@WithJwt`/`@WithMockUser`): 200/public, 401, 403/role
+- [x] 6.1 Update `@SpringBootTest` controller tests — add `@WithJwt`/`@WithMockUser` (resolved: `SecurityMockMvcRequestPostProcessors.jwt()` en los 16 requests de `IncidentControllerTest`; matriz de roles en full-context `IncidentSecurityIntegrationTest`)
+- [x] 6.2 Update `UserServiceClientWireMockTest` — assert `Authorization` forwarded (relay + propagación 401 e2e con `@MockitoBean JwtDecoder`)
+- [x] 6.3 Create auth matrix tests (`@WithJwt`/`@WithMockUser`): 200/public, 401, 403/role (resolved: `IncidentSecurityIntegrationTest` full-context: 8 casos — público, sin-token 401, USER create+read 200, USER list/assign/transition 403, AGENT/ADMIN list 200)
 - [x] 6.4 Create notification owner-check tests (`@WithJwt` claims): own→200, admin any→200, other→403 (+401 sin token, full-context matrix)
 - [ ] 6.5 Update `GatewayAuthorizationTest` — remove `/eureka/**` from public routes
 

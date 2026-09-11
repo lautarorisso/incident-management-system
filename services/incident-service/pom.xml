@@ -95,6 +95,15 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Security test support for the auth matrix (@WithJwt / jwt() post-processor).
+             The security starters themselves arrive transitively via shared,
+             matching user-service and notification-service (design: single CVE-fix
+             location in com.ims.shared). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>

@@ -24,6 +24,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -35,6 +36,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>
  * Mocks {@link IncidentService} to test HTTP request/response handling,
  * validation, and error scenarios with manual DTO mapping.
+ * <p>
+ * With the security starters on the classpath the {@code @WebMvcTest} slice runs
+ * Spring Security's default chain, so every request authenticates via the
+ * {@code jwt()} request post-processor (no JwtDecoder involved — the slice does
+ * not load {@code SecurityConfig}; the full role matrix is covered by
+ * {@code IncidentSecurityIntegrationTest}).
  */
 @WebMvcTest(IncidentController.class)
 class IncidentControllerTest {
@@ -75,7 +82,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(incidentUuid.toString()))
                 .andExpect(jsonPath("$.title").value("Test incident"))
@@ -89,7 +97,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -99,7 +108,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -109,7 +119,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(post("/api/incidents")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -139,7 +150,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(put("/api/incidents/{id}/assign", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(incidentUuid.toString()))
                 .andExpect(jsonPath("$.assigneeId").value(assigneeId.toString()))
@@ -152,7 +164,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(put("/api/incidents/{id}/assign", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -177,7 +190,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(put("/api/incidents/{id}/transition", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
     }
@@ -188,7 +202,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(put("/api/incidents/{id}/transition", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -198,7 +213,8 @@ class IncidentControllerTest {
 
         mockMvc.perform(put("/api/incidents/{id}/transition", incidentUuid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -219,7 +235,8 @@ class IncidentControllerTest {
         when(incidentService.getIncident(incidentUuid))
                 .thenReturn(Optional.of(domain));
 
-        mockMvc.perform(get("/api/incidents/{id}", incidentUuid))
+        mockMvc.perform(get("/api/incidents/{id}", incidentUuid)
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(incidentUuid.toString()))
                 .andExpect(jsonPath("$.title").value("Found incident"))
@@ -233,7 +250,8 @@ class IncidentControllerTest {
         when(incidentService.getIncident(missingId))
                 .thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/incidents/{id}", missingId))
+        mockMvc.perform(get("/api/incidents/{id}", missingId)
+                        .with(jwt()))
                 .andExpect(status().isNotFound());
     }
 
@@ -242,7 +260,8 @@ class IncidentControllerTest {
         when(incidentService.getIncident(incidentUuid))
                 .thenThrow(new com.ims.shared.exception.NotFoundException("Incident not found: " + incidentUuid));
 
-        mockMvc.perform(get("/api/incidents/{id}", incidentUuid))
+        mockMvc.perform(get("/api/incidents/{id}", incidentUuid)
+                        .with(jwt()))
                 .andExpect(status().isNotFound());
     }
 
@@ -273,7 +292,8 @@ class IncidentControllerTest {
         when(incidentService.listIncidents(any(), any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(domain1, domain2)));
 
-        mockMvc.perform(get("/api/incidents"))
+        mockMvc.perform(get("/api/incidents")
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.totalElements").value(2))
@@ -286,7 +306,8 @@ class IncidentControllerTest {
         when(incidentService.listIncidents(any(), any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        mockMvc.perform(get("/api/incidents"))
+        mockMvc.perform(get("/api/incidents")
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
@@ -295,14 +316,16 @@ class IncidentControllerTest {
     @Test
     void shouldReturn400ForInvalidStatusFilter() throws Exception {
         mockMvc.perform(get("/api/incidents")
-                        .param("status", "BANANA"))
+                        .param("status", "BANANA")
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldReturn400ForInvalidPriorityFilter() throws Exception {
         mockMvc.perform(get("/api/incidents")
-                        .param("priority", "MEGA_ULTRA_HIGH"))
+                        .param("priority", "MEGA_ULTRA_HIGH")
+                        .with(jwt()))
                 .andExpect(status().isBadRequest());
     }
 }

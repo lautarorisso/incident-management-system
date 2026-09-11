@@ -14,7 +14,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Extends {@link BaseGlobalExceptionHandler} for common exceptions
  * and adds Feign-specific error handling:
  * <ul>
- *   <li>{@link FeignException} 4xx → passthrough (e.g. downstream 404)</li>
+ *   <li>{@link FeignException} 401/403 → the EXACT downstream status is
+ *       propagated (never masked as 503): a downstream auth failure means the
+ *       relayed token was rejected by user-service — the caller must see the
+ *       real status so the security problem is not hidden</li>
+ *   <li>{@link FeignException} other 4xx → passthrough (e.g. downstream 404)</li>
  *   <li>{@link FeignException} 5xx / connectivity → 503 Service Unavailable</li>
  * </ul>
  */
@@ -25,6 +29,10 @@ public class GlobalExceptionHandler extends BaseGlobalExceptionHandler {
     @ExceptionHandler(FeignException.class)
     protected ProblemDetail handleFeignException(FeignException ex) {
         int status = ex.status();
+        if (status == 401 || status == 403) {
+            log.error("Downstream auth failure from Feign: status={}, message={}", status, ex.getMessage());
+            return buildProblemDetail(HttpStatus.valueOf(status), sanitizeFeignMessage(ex));
+        }
         if (status >= 400 && status < 500) {
             log.warn("Downstream 4xx from Feign: status={}, message={}", status, ex.getMessage());
             return buildProblemDetail(HttpStatus.valueOf(status), sanitizeFeignMessage(ex));
