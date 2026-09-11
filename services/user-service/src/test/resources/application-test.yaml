@@ -1,4 +1,14 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Config server is disabled in tests, so the issuer comes from the
+          # test profile directly. The Nimbus decoder only performs OIDC
+          # discovery on first token validation, so context startup does not
+          # require Keycloak to be reachable (same default as config-server
+          # user-service.yaml).
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:18080/realms/ims}
   jpa:
     hibernate:
       ddl-auto: validate

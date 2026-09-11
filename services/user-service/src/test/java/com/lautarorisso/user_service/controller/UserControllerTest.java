@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,8 +28,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Web MVC tests for {@link UserController}.
  * <p>
  * Mocks the service layer and verifies HTTP handling and manual DTO mapping.
+ * <p>
+ * With Spring Security on the classpath the {@code @WebMvcTest} slice applies
+ * Spring Security's default filter chain (this slice does not load the
+ * service's {@code SecurityConfig}), so every request needs an authenticated
+ * principal. {@link WithMockUser} provides one; JWT validation itself is
+ * covered by the service-level auth matrix tests, not this slice.
  */
 @WebMvcTest(UserController.class)
+@WithMockUser
 class UserControllerTest {
 
     @Autowired

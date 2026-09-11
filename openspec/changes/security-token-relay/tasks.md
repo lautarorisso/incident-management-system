@@ -36,8 +36,8 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Core Implementation
 
-- [ ] 2.1 Modify `services/user-service/pom.xml` — add security starters
-- [ ] 2.2 Create `services/user-service/.../config/SecurityConfig.java` — `@Import` + role matrix
+- [x] 2.1 Modify `services/user-service/pom.xml` — add security starters (resolved: starters transitives via shared per design; pom adds `spring-security-test` test scope)
+- [x] 2.2 Create `services/user-service/.../config/SecurityConfig.java` — `@Import` + role matrix
 - [ ] 2.3 Modify `services/notification-service/pom.xml` — add security starters
 - [ ] 2.4 Create `services/notification-service/.../config/SecurityConfig.java` — `@Import` + owner-check
 - [ ] 2.5 Modify `NotificationController.java` — owner-check: `sub == userId` or `ROLE_ADMIN` → 403
