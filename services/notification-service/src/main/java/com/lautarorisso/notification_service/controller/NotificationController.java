@@ -14,7 +14,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,17 +44,26 @@ public class NotificationController {
 
     @GetMapping
     @Operation(summary = "Get notifications for a user",
-            description = "Returns notifications for the specified user, optionally filtered by status")
+            description = "Returns notifications for the specified user, optionally filtered by status. "
+                    + "Access is restricted to the owner (JWT sub == userId) or an admin.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of notifications",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = NotificationListItem.class)))),
-            @ApiResponse(responseCode = "400", description = "Missing required userId parameter")
+            @ApiResponse(responseCode = "400", description = "Missing required userId parameter"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
+            @ApiResponse(responseCode = "403", description = "Not the notification owner and not an admin")
     })
     public ResponseEntity<List<NotificationListItem>> getNotifications(
             @Parameter(description = "User ID to get notifications for", required = true)
             @RequestParam UUID userId,
             @Parameter(description = "Filter by status (UNREAD, READ)")
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+
+        if (!isOwnerOrAdmin(jwt, authentication, userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         List<Notification> notifications;
         if (status != null) {
@@ -104,6 +117,19 @@ public class NotificationController {
     }
 
     // --- Manual mapping helpers (no MapStruct) ---
+
+    /**
+     * Owner-check for the notification list endpoint: a caller may list the
+     * notifications of {@code userId} only when the JWT {@code sub} claim
+     * equals it, or when the caller holds {@code ROLE_ADMIN}. Violations
+     * return 403 (never 404) so notification existence is not leaked.
+     */
+    private boolean isOwnerOrAdmin(Jwt jwt, Authentication authentication, UUID userId) {
+        String sub = jwt != null ? jwt.getSubject() : null;
+        boolean admin = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        return userId.toString().equals(sub) || admin;
+    }
 
     private NotificationResponse toResponse(Notification notification) {
         return new NotificationResponse(

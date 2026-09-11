@@ -38,9 +38,9 @@ Chain strategy: stacked-to-main
 
 - [x] 2.1 Modify `services/user-service/pom.xml` — add security starters (resolved: starters transitives via shared per design; pom adds `spring-security-test` test scope)
 - [x] 2.2 Create `services/user-service/.../config/SecurityConfig.java` — `@Import` + role matrix
-- [ ] 2.3 Modify `services/notification-service/pom.xml` — add security starters
-- [ ] 2.4 Create `services/notification-service/.../config/SecurityConfig.java` — `@Import` + owner-check
-- [ ] 2.5 Modify `NotificationController.java` — owner-check: `sub == userId` or `ROLE_ADMIN` → 403
+- [x] 2.3 Modify `services/notification-service/pom.xml` — add security starters (resolved: transitives via shared per design; pom adds `spring-security-test` test scope)
+- [x] 2.4 Create `services/notification-service/.../config/SecurityConfig.java` — `@Import` + authenticated `/api/notifications/**` (owner-check en controller)
+- [x] 2.5 Modify `NotificationController.java` — owner-check: `sub == userId` or `ROLE_ADMIN` → 403 exacto, `@RequestParam userId` mantenido
 
 ## Phase 3: Integration / Wiring
 
@@ -65,7 +65,7 @@ Chain strategy: stacked-to-main
 - [ ] 6.1 Update `@SpringBootTest` controller tests — add `@WithJwt`/`@WithMockUser`
 - [ ] 6.2 Update `UserServiceClientWireMockTest` — assert `Authorization` forwarded
 - [ ] 6.3 Create auth matrix tests (`@WithJwt`/`@WithMockUser`): 200/public, 401, 403/role
-- [ ] 6.4 Create notification owner-check tests (`@WithJwt` claims): own→200, admin any→200, other→403
+- [x] 6.4 Create notification owner-check tests (`@WithJwt` claims): own→200, admin any→200, other→403 (+401 sin token, full-context matrix)
 - [ ] 6.5 Update `GatewayAuthorizationTest` — remove `/eureka/**` from public routes
 
 ## Phase 7: Cleanup

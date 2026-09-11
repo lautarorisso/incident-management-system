@@ -20,6 +20,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -52,7 +53,8 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications")
                         .param("userId", userId.toString())
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Test notification"))
                 .andExpect(jsonPath("$[0].status").value("UNREAD"));
@@ -78,7 +80,8 @@ class NotificationControllerTest {
         mockMvc.perform(get("/api/notifications")
                         .param("userId", userId.toString())
                         .param("status", "UNREAD")
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Unread notification"))
                 .andExpect(jsonPath("$[0].status").value("UNREAD"));
@@ -103,7 +106,8 @@ class NotificationControllerTest {
                 .thenReturn(Optional.of(notification));
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(notificationId.toString()))
                 .andExpect(jsonPath("$.title").value("Test notification"));
@@ -114,7 +118,8 @@ class NotificationControllerTest {
         when(notificationRepository.findById(any())).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/notifications/{id}", UUID.randomUUID())
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
                 .andExpect(status().isNotFound());
     }
 
@@ -139,7 +144,8 @@ class NotificationControllerTest {
                 .thenAnswer(inv -> inv.getArgument(0));
 
         mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READ"));
     }
@@ -149,7 +155,8 @@ class NotificationControllerTest {
         when(notificationRepository.findById(any())).thenReturn(Optional.empty());
 
         mockMvc.perform(patch("/api/notifications/{id}/read", UUID.randomUUID())
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
                 .andExpect(status().isNotFound());
     }
 
@@ -161,7 +168,8 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications")
                         .param("userId", userId.toString())
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
@@ -186,7 +194,8 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications")
                         .param("userId", userId.toString())
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].message").doesNotExist())
                 .andExpect(jsonPath("$[0].userId").doesNotExist())
@@ -212,7 +221,8 @@ class NotificationControllerTest {
                 .thenReturn(Optional.of(notification));
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Full message content"))
                 .andExpect(jsonPath("$.userId").exists())

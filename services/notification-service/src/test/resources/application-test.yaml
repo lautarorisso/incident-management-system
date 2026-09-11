@@ -1,4 +1,13 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Config server is disabled in tests, so the issuer comes from the
+          # test profile directly. The Spring Security 6.5 JwtDecoder is eager
+          # at startup: without issuer-uri the @SpringBootTest context fails
+          # (same default as config-server notification-service.yaml).
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:18080/realms/ims}
   rabbitmq:
     listener:
       auto-startup: false
