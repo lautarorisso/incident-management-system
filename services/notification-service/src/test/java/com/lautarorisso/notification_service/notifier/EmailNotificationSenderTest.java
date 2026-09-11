@@ -84,8 +84,14 @@ class EmailNotificationSenderTest {
         assertTrue(ex.getCause() instanceof MessagingException);
     }
 
+    /**
+     * Verifies the wrapped {@link NotificationDeliveryException} preserves the
+     * original {@link MessagingException} and its message. Production logging
+     * deliberately includes the cause ({@code log.error(..., e)}) for diagnostics;
+     * this test does not assert on logs.
+     */
     @Test
-    void shouldNotExposeCauseInLogWhenMessagingExceptionOccurs() throws Exception {
+    void shouldPreserveMessagingExceptionCauseAndMessage() throws Exception {
         EmailNotificationSender sender = new EmailNotificationSender(mailSender, "from@test.local", true);
         MimeMessage failingMessage = mock(MimeMessage.class);
         doThrow(new MessagingException("internal details"))
