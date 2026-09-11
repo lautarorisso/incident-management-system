@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Spring Boot 3.5.16, Java 21, Spring Cloud 2025.0.3
+  Architecture: Microservices (Eureka discovery, API Gateway, Config Server, 3 business services)
+  Build: Maven multi-module, Testcontainers (PostgreSQL 16, MongoDB 7, RabbitMQ 3)
+  Testing: JUnit 5, Mockito, REST Assured (E2E)
+  Style: Clean/Hexagonal, Lombok, Flyway migrations
+
+strict_tdd: false
+
+testing:
+  workspace_command: "./scripts/test.sh test"
+  e2e_command: "./scripts/e2e-test.sh"
+  note: "Workspace command covers all 7 Maven reactor modules but NOT config-server (git submodule with own parent POM)"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+    tdd: false
+    test_command: "./scripts/test.sh test"
+  verify:
+    test_command: "./scripts/test.sh test"
+    build_command: "./mvnw package -DskipTests"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

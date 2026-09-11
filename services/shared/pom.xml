@@ -21,6 +21,24 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Servlet security surface shared by the business services (JWT resource
+             server). Deliberately non-optional: services consume the starters
+             transitively instead of redeclaring them, keeping CVE fixes in one place.
+             The gateway already declares the same managed versions itself. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- feign-core for the token relay RequestInterceptor; version managed by
+             spring-cloud-dependencies (imports the OpenFeign BOM). -->
+        <dependency>
+            <groupId>io.github.openfeign</groupId>
+            <artifactId>feign-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
