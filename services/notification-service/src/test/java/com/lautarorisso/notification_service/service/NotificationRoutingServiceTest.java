@@ -1,6 +1,6 @@
 package com.lautarorisso.notification_service.service;
 
-import com.lautarorisso.notification_service.entity.NotificationType;
+import com.lautarorisso.notification_service.enums.NotificationType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

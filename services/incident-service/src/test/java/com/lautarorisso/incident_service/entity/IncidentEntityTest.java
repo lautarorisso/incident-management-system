@@ -13,6 +13,9 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import com.lautarorisso.incident_service.enums.IncidentEvent;
+import com.lautarorisso.incident_service.enums.IncidentPriority;
+import com.lautarorisso.incident_service.enums.IncidentStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 

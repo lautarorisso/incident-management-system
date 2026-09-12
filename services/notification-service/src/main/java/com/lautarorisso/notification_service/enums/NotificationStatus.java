@@ -1,4 +1,4 @@
-package com.lautarorisso.notification_service.entity;
+package com.lautarorisso.notification_service.enums;
 
 /**
  * Status indicating the delivery and read state of a notification.

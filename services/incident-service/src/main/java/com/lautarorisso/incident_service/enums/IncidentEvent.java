@@ -1,4 +1,4 @@
-package com.lautarorisso.incident_service.entity;
+package com.lautarorisso.incident_service.enums;
 
 /**
  * Domain event types that can be published when an Incident changes state.

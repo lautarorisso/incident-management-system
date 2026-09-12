@@ -1,8 +1,8 @@
 package com.lautarorisso.notification_service.messaging;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.entity.NotificationStatus;
-import com.lautarorisso.notification_service.entity.NotificationType;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
 import com.lautarorisso.notification_service.support.AbstractMongoTestBase;

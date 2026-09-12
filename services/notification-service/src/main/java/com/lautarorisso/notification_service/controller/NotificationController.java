@@ -3,7 +3,7 @@ package com.lautarorisso.notification_service.controller;
 import com.lautarorisso.notification_service.dto.NotificationListItem;
 import com.lautarorisso.notification_service.dto.NotificationResponse;
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.entity.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationType;
 
 import static org.junit.jupiter.api.Assertions.*;
 

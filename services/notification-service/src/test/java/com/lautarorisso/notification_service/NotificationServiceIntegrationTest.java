@@ -1,7 +1,7 @@
 package com.lautarorisso.notification_service;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.entity.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
 import com.lautarorisso.notification_service.messaging.IncidentEventListener;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;

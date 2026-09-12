@@ -1,8 +1,8 @@
 package com.lautarorisso.incident_service.repository;
 
 import com.lautarorisso.incident_service.entity.Incident;
-import com.lautarorisso.incident_service.entity.IncidentPriority;
-import com.lautarorisso.incident_service.entity.IncidentStatus;
+import com.lautarorisso.incident_service.enums.IncidentPriority;
+import com.lautarorisso.incident_service.enums.IncidentStatus;
 import com.lautarorisso.incident_service.support.AbstractPostgresTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

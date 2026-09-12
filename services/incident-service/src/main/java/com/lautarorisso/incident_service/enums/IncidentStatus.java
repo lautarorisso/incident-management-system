@@ -1,4 +1,4 @@
-package com.lautarorisso.incident_service.entity;
+package com.lautarorisso.incident_service.enums;
 
 /**
  * Lifecycle states for an Incident.

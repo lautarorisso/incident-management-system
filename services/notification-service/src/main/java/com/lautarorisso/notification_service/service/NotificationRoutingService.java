@@ -1,6 +1,6 @@
 package com.lautarorisso.notification_service.service;
 
-import com.lautarorisso.notification_service.entity.NotificationType;
+import com.lautarorisso.notification_service.enums.NotificationType;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;

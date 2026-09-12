@@ -1,4 +1,4 @@
-package com.lautarorisso.notification_service.entity;
+package com.lautarorisso.notification_service.enums;
 
 /**
  * Types of notifications that can be generated from incident events.

@@ -15,6 +15,8 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.lautarorisso.incident_service.enums.IncidentPriority;
+import com.lautarorisso.incident_service.enums.IncidentStatus;
 
 /**
  * JPA entity mapping the incidents table.

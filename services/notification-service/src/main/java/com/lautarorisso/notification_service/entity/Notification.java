@@ -11,6 +11,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationType;
 
 /**
  * MongoDB document mapping the notifications collection.

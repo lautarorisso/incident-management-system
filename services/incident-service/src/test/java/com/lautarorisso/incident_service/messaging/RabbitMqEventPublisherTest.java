@@ -1,6 +1,6 @@
 package com.lautarorisso.incident_service.messaging;
 
-import com.lautarorisso.incident_service.entity.IncidentEvent;
+import com.lautarorisso.incident_service.enums.IncidentEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

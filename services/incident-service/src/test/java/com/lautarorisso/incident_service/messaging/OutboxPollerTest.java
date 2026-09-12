@@ -1,7 +1,7 @@
 package com.lautarorisso.incident_service.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lautarorisso.incident_service.entity.IncidentEvent;
+import com.lautarorisso.incident_service.enums.IncidentEvent;
 import com.lautarorisso.incident_service.entity.OutboxEvent;
 import com.lautarorisso.incident_service.repository.OutboxEventRepository;
 import com.lautarorisso.incident_service.service.OutboxPoller;

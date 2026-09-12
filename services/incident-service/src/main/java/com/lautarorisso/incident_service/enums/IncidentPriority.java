@@ -1,4 +1,4 @@
-package com.lautarorisso.incident_service.entity;
+package com.lautarorisso.incident_service.enums;
 
 /**
  * Severity levels for an Incident, ordered from least to most urgent.

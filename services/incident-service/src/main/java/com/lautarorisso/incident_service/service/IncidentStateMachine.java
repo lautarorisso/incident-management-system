@@ -1,7 +1,7 @@
 package com.lautarorisso.incident_service.service;
 
 import com.lautarorisso.incident_service.entity.Incident;
-import com.lautarorisso.incident_service.entity.IncidentStatus;
+import com.lautarorisso.incident_service.enums.IncidentStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;

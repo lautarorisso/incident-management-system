@@ -2,8 +2,8 @@ package com.lautarorisso.notification_service.notifier;
 
 import com.ims.shared.exception.NotificationDeliveryException;
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.entity.NotificationStatus;
-import com.lautarorisso.notification_service.entity.NotificationType;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationType;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;

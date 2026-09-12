@@ -1,7 +1,7 @@
 package com.lautarorisso.notification_service.repository;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.entity.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
