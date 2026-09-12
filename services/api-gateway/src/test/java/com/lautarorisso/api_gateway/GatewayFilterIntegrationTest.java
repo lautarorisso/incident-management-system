@@ -14,8 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * GlobalFilters execute before route resolution, so we can verify filter
  * headers even when the backend is unreachable (expected 5xx error).
  * <p>
- * The X-User-Id JWT scenario is verified in {@code UserIdHeaderFilterTest}
- * since {@code mockJwt()} is not compatible with {@code RANDOM_PORT} mode.
+ * No gateway filter injects {@code X-User-Id}: the {@code UserIdHeaderFilter}
+ * was removed with the JWT-resource-server change (identity now comes from the
+ * JWT {@code sub} claim validated by each service).
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -67,7 +68,7 @@ class GatewayFilterIntegrationTest {
     }
 
     @Test
-    void userIdHeaderFilterShouldNotSetHeaderWithoutAuth() {
+    void noGatewayFilterInjectsXUserIdHeader() {
         webTestClient.get()
                 .uri("/filter-test/headers")
                 .exchange()

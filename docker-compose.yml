@@ -167,6 +167,7 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: incident-service
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/ims
 
   notification-service:
     build:
@@ -192,6 +193,7 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: notification-service
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/ims
 
   user-service:
     build:
@@ -216,6 +218,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: user-service
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/ims
 
 volumes:
   postgres_data:

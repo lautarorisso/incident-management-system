@@ -21,6 +21,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * A single ordered {@code @Test} keeps the test independent of JUnit method
  * ordering. A unique title (epoch-millis suffix) makes re-runs deterministic
  * and tolerant of data left over by previous runs.
+ * <p>
+ * Role usage: the lifecycle runs with the seeded agent ({@code agente1},
+ * {@code ROLE_AGENT}) — allowed to create, list, assign, transition and read
+ * the user directory. The notification delivery check polls with the seeded
+ * admin ({@code lautaro}, {@code ROLE_ADMIN}) because the notification list
+ * endpoint enforces an owner/admin check ({@code sub == userId} or
+ * {@code ROLE_ADMIN}), and the assignee id resolved from the user directory is
+ * the user-service internal id, not a JWT subject. A non-owner (seeded user,
+ * {@code ROLE_USER}) is asserted to receive 403.
  */
 @DisplayName("Incident lifecycle through the API Gateway")
 class IncidentFlowE2E {
@@ -30,6 +39,12 @@ class IncidentFlowE2E {
 
     private static final long NOTIFICATION_TIMEOUT_SECONDS = 60;
     private static final long NOTIFICATION_POLL_INTERVAL_SECONDS = 2;
+
+    // Seed users from keycloak/import/ims-realm.json.
+    private static final String ADMIN_USER = "lautaro";
+    private static final String ADMIN_PASSWORD = "admin1234";
+    private static final String USER_USER = "usuario1";
+    private static final String USER_PASSWORD = "usuario1234";
 
     @Test
     @DisplayName("create → retrieve → list → assign → transition → notification delivered")
@@ -137,11 +152,15 @@ class IncidentFlowE2E {
 
         // (7) Poll notifications through the gateway until the assignee has at
         // least one — proves outbox → RabbitMQ → notification-service delivery.
+        // The admin token is used: the notification list endpoint enforces
+        // owner/admin ({@code sub == userId} or ROLE_ADMIN) and the assignee id
+        // here is the user-service internal id.
+        String adminToken = TokenProvider.bearerToken(ADMIN_USER, ADMIN_PASSWORD);
         boolean delivered = Await.await(
-                () -> notificationCount(token, assigneeId) > 0,
+                () -> notificationCount(adminToken, assigneeId) > 0,
                 NOTIFICATION_TIMEOUT_SECONDS,
                 NOTIFICATION_POLL_INTERVAL_SECONDS);
-        int finalCount = notificationCount(token, assigneeId);
+        int finalCount = notificationCount(adminToken, assigneeId);
 
         assertThat(delivered)
                 .as("at least one notification within %ss for assignee %s",
@@ -150,6 +169,19 @@ class IncidentFlowE2E {
         assertThat(finalCount)
                 .as("notifications delivered to assignee %s", assigneeId)
                 .isGreaterThan(0);
+
+        // (8) Owner-check: a non-owner (ROLE_USER) cannot read another user's
+        // notifications — 403, never 200, so notification existence is not
+        // leaked.
+        String userToken = TokenProvider.bearerToken(USER_USER, USER_PASSWORD);
+        Response forbidden = authorized(userToken)
+                .when()
+                .get(E2EConfig.GATEWAY_URL + "/api/notifications?userId=" + assigneeId)
+                .thenReturn();
+
+        assertThat(forbidden.getStatusCode())
+                .as("non-owner GET /api/notifications?userId=%s HTTP status", assigneeId)
+                .isEqualTo(403);
     }
 
     private static RequestSpecification authorized(String token) {

@@ -14,10 +14,6 @@ spring:
       server:
         webflux:
           routes:
-            - id: discovery-service
-              uri: http://${DISCOVERY_HOST:localhost}:8761
-              predicates: Path=/eureka/web**
-              filters: SetPath=/eureka/web
             - id: incident-service-docs
               uri: lb://incident-service
               predicates: Path=/api/incidents/v3/api-docs/**

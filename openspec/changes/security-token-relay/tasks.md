@@ -51,8 +51,8 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Gateway Cleanup
 
-- [ ] 4.1 Modify `api-gateway/.../config/SecurityConfig.java` — remove `/eureka/**` from permitAll
-- [ ] 4.2 Delete `api-gateway/.../filter/UserIdHeaderFilter.java` — remove entirely
+- [x] 4.1 Modify `api-gateway/.../config/SecurityConfig.java` — remove `/eureka/**` from permitAll (también eliminada la ruta `discovery-service` de `application.yaml` del gateway y de `config-server/api-gateway.yaml` — exponía `/eureka/web**` al exterior; el client eureka queda intacto para registro/discovery lb://)
+- [x] 4.2 Delete `api-gateway/.../filter/UserIdHeaderFilter.java` — remove entirely (+ `UserIdHeaderFilterTest.java`, + javadoc/README actualizados; GatewayFilterIntegrationTest conserva la aserción de que NINGÚN filtro inyecta X-User-Id)
 
 ## Phase 5: Config Server
 
@@ -66,9 +66,9 @@ Chain strategy: stacked-to-main
 - [x] 6.2 Update `UserServiceClientWireMockTest` — assert `Authorization` forwarded (relay + propagación 401 e2e con `@MockitoBean JwtDecoder`)
 - [x] 6.3 Create auth matrix tests (`@WithJwt`/`@WithMockUser`): 200/public, 401, 403/role (resolved: `IncidentSecurityIntegrationTest` full-context: 8 casos — público, sin-token 401, USER create+read 200, USER list/assign/transition 403, AGENT/ADMIN list 200)
 - [x] 6.4 Create notification owner-check tests (`@WithJwt` claims): own→200, admin any→200, other→403 (+401 sin token, full-context matrix)
-- [ ] 6.5 Update `GatewayAuthorizationTest` — remove `/eureka/**` from public routes
+- [x] 6.5 Update `GatewayAuthorizationTest` — remove `/eureka/**` from public routes (+ tests nuevos: `/eureka/` sin token → 401, `/eureka/` con token → 404 porque la ruta se eliminó; E2E de matriz: `GatewaySecurityE2E` con 7 casos contra stack real — eureka 401/404, USER crea 2xx, USER lista incidentes 403, AGENT lista 200, USER directory 403, AGENT directory 200, X-User-Id ignorado 403)
 
 ## Phase 7: Cleanup
 
-- [ ] 7.1 Remove temporary debugging code in services
-- [ ] 7.2 Verify no `X-User-Id` consumption; identity from JWT `sub`
+- [x] 7.1 Remove temporary debugging code in services (grep repo-wide: cero referencias a `X-User-Id` en código main de servicios; único código restante era el filtro del gateway — eliminado — y su test — eliminado; README y javadocs actualizados)
+- [x] 7.2 Verify no `X-User-Id` consumption; identity from JWT `sub` (evidencia: `grep -r X-User-Id` → solo openspec artifacts y docs; `UserIdHeaderFilter` borrado; owner-check notification usa exclusivamente `jwt.getSubject()` + authorities; E2E `xUserIdHeaderDoesNotGrantOwnership` demuestra que el header no otorga ownership)

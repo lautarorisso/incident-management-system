@@ -124,6 +124,20 @@ class GatewayAuthorizationTest {
                 .expectStatus().value(status -> assertThat(status).isNotEqualTo(401).isNotEqualTo(403));
     }
 
+    @Test
+    void eurekaIsNoLongerPubliclyAccessible() {
+        client.get().uri("/eureka/")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void eurekaRouteIsRemovedForAuthenticatedCallers() {
+        client.get().uri("/eureka/").header(HttpHeaders.AUTHORIZATION, ADMIN)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
     private void expectPastSecurity(Supplier<WebTestClient.RequestHeadersSpec<?>> request) {
         request.get().exchange()
                 .expectStatus().value(status -> assertThat(status).isGreaterThanOrEqualTo(500));

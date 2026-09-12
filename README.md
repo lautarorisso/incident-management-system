@@ -154,7 +154,7 @@ bearer token issued by a Keycloak `ims` realm. Realm roles map to authorities as
 | `PUT /api/incidents/{id}/assign`, `PUT /api/incidents/{id}/transition` | ADMIN, AGENT |
 | `GET /api/incidents/**`, `/api/notifications/**` | any authenticated user |
 | `/api/users/**`, `/api/teams/**` | ADMIN, AGENT |
-| actuator, scalar, api-docs, eureka | public |
+| actuator, scalar, api-docs | public |
 
 To obtain a token manually (dev client with direct access grants enabled):
 
@@ -299,7 +299,6 @@ builds it from this submodule via `docker/config-server.Dockerfile`.
 - `CorrelationIdFilter` (order -100) — injects `X-Correlation-Id`
 - `RequestLoggingFilter` (order -90) — logs method/path/status/duration
 - `RateLimitFilter` (order -80) — token bucket per client IP
-- `UserIdHeaderFilter` (order -60) — JWT `sub` → `X-User-Id` (maps Keycloak user id to the user-service record)
 
 Slim test coverage is pending (see project structure).
 

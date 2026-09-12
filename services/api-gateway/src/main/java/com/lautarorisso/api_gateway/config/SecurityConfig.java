@@ -16,7 +16,8 @@ import com.lautarorisso.api_gateway.security.JwtRoleConverter;
  * issuer's public keys (see
  * {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} in the config
  * server) and realm roles are mapped to authorities by
- * {@link JwtRoleConverter}. Actuator, API docs, Scalar and Eureka stay public.
+ * {@link JwtRoleConverter}. Actuator, API docs and Scalar stay public; the
+ * Eureka dashboard is no longer exposed through the gateway.
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -28,7 +29,7 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/actuator/**", "/scalar", "/scalar/**", "/v3/api-docs/**", "/eureka/**").permitAll()
+                        .pathMatchers("/actuator/**", "/scalar", "/scalar/**", "/v3/api-docs/**").permitAll()
                         // Incident creation is open to every authenticated role.
                         .pathMatchers(HttpMethod.POST, "/api/incidents").hasAnyRole("ADMIN", "AGENT", "USER")
                         // Workflow operations are for staff only.
