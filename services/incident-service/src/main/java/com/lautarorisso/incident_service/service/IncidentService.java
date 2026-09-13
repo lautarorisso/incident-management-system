@@ -37,29 +37,13 @@ public class IncidentService {
     private final IncidentRepository incidentRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final UserServiceClient userServiceClient;
-    private final IncidentStateMachine stateMachine;
     private final ObjectMapper objectMapper;
 
     // --- create ---
 
     @Transactional
     public Incident createIncident(String title, String description, IncidentPriority priority) {
-        if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException("Title must not be blank");
-        }
-
-        IncidentPriority resolvedPriority = priority != null ? priority : IncidentPriority.MEDIUM;
-        Instant now = Instant.now();
-
-        Incident incident = Incident.builder()
-                .id(UUID.randomUUID())
-                .title(title.trim())
-                .description(description != null ? description.trim() : null)
-                .status(IncidentStatus.OPEN)
-                .priority(resolvedPriority)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        Incident incident = Incident.open(title, description, priority);
 
         Incident saved = incidentRepository.save(incident);
         publishOutbox(IncidentEvent.INCIDENT_CREATED, saved);
@@ -87,9 +71,7 @@ public class IncidentService {
             userServiceClient.findTeamById(teamId);
         }
 
-        incident.setAssigneeId(assigneeId);
-        incident.setTeamId(teamId);
-        incident.setUpdatedAt(Instant.now());
+        incident.assignTo(assigneeId, teamId);
 
         Incident saved = incidentRepository.save(incident);
         publishOutbox(IncidentEvent.INCIDENT_ASSIGNED, saved);
@@ -108,7 +90,7 @@ public class IncidentService {
         Incident incident = incidentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incident not found: " + id));
 
-        stateMachine.changeStatus(incident, newStatus);
+        incident.changeStatus(newStatus);
 
         Incident saved = incidentRepository.save(incident);
         publishOutbox(IncidentEvent.INCIDENT_STATUS_CHANGED, saved);

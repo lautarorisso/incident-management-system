@@ -196,16 +196,17 @@ class IncidentRepositoryTest extends AbstractPostgresTestBase {
 
     private void persistIncident(IncidentStatus status, IncidentPriority priority,
                                   UUID assigneeId, UUID teamId) {
-        Incident entity = new Incident();
-        entity.setId(UUID.randomUUID());
-        entity.setTitle("Test");
-        entity.setDescription("Desc");
-        entity.setStatus(status);
-        entity.setPriority(priority);
-        entity.setAssigneeId(assigneeId);
-        entity.setTeamId(teamId);
-        entity.setCreatedAt(Instant.now());
-        entity.setUpdatedAt(Instant.now());
+        Incident entity = Incident.builder()
+                .id(UUID.randomUUID())
+                .title("Test")
+                .description("Desc")
+                .status(status)
+                .priority(priority)
+                .assigneeId(assigneeId)
+                .teamId(teamId)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
         incidentRepo.save(entity);
     }
 }

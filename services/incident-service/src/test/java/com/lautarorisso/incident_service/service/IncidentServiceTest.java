@@ -59,7 +59,6 @@ class IncidentServiceTest {
     private UserServiceClient userServiceClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final IncidentStateMachine stateMachine = new IncidentStateMachine();
 
     private IncidentService incidentService;
 
@@ -80,7 +79,6 @@ class IncidentServiceTest {
                 incidentRepository,
                 outboxEventRepository,
                 userServiceClient,
-                stateMachine,
                 objectMapper);
     }
 
