@@ -18,10 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # `services/config-server` is a git submodule (Spring Cloud Config
-          # native repo, owns the per-service yaml). If that repo is private,
-          # provide a PAT in a secret and pass it via `token:` here — the
-          # default GITHUB_TOKEN cannot read a different private repository.
+          # `services/config-server` is a public git submodule (Spring Cloud
+          # Config native repo, owns the per-service yaml). The default
+          # GITHUB_TOKEN reads public repositories, so no extra token is needed.
           submodules: recursive
       - uses: actions/setup-java@v4
         with:
