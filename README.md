@@ -1,5 +1,7 @@
 # Incident Management System
 
+![CI](https://github.com/lautarorisso/incident-management-system/actions/workflows/ci.yml/badge.svg)
+
 Microservices-based incident management system built with Spring Boot 3.5, Spring Cloud 2025, and Java 21.
 
 > **Note**: This is a work-in-progress MVP for portfolio demonstration. It runs fully containerized with Keycloak authentication (realm, users and roles are provisioned automatically).
