@@ -47,7 +47,7 @@ All domain services use a **layered architecture** (controller → service → r
 | api-gateway | 8080 | Routing, rate limiting, circuit breakers, request logging, JWT validation (Keycloak) |
 | config-server | 8888 | Spring Cloud Config Server — central configuration for all services |
 | discovery-service | 8761 | Eureka Service Discovery Server |
-| incident-service | 8081 | Incident CRUD, state machine, outbox pattern, RabbitMQ events |
+| incident-service | 8081 | Incident CRUD, self-validating domain model, outbox pattern, RabbitMQ events |
 | notification-service | 8083 | Consumes incident events from RabbitMQ, persists and delivers notifications |
 | user-service | 8082 | Read-only user profiles and teams |
 
@@ -68,14 +68,14 @@ All domain services use a **layered architecture** (controller → service → r
 `config-server` is a git submodule (see [Config Server](#config-server)), so clone it recursively:
 
 ```bash
-git clone --recursive [<repo-url>](https://github.com/lautarorisso/incident-management-system)
+git clone --recursive https://github.com/lautarorisso/incident-management-system
 cd incident-management-system
 docker compose up -d --build
 ```
 
 > Already cloned without `--recursive`? Run `git submodule update --init --recursive`.
 
-This builds and starts all 9 containers (3 infra + 6 services). Wait ~60 seconds for all services to register in Eureka, then:
+This builds and starts all 10 containers (4 infra + 6 services). Wait ~60 seconds for all services to register in Eureka, then:
 
 | URL | What |
 |-----|------|
@@ -150,9 +150,12 @@ bearer token issued by a Keycloak `ims` realm. Realm roles map to authorities as
 
 | Route | Required roles |
 |-------|----------------|
-| `POST /api/incidents` | ADMIN, AGENT or USER |
+| `POST /api/incidents` | ADMIN, AGENT or USER (any authenticated role) |
+| `GET /api/incidents` (list) | ADMIN, AGENT (USER → 403) |
+| `GET /api/incidents/{id}` | any authenticated role |
 | `PUT /api/incidents/{id}/assign`, `PUT /api/incidents/{id}/transition` | ADMIN, AGENT |
-| `GET /api/incidents/**`, `/api/notifications/**` | any authenticated user |
+| `GET /api/notifications?userId={id}` | owner (JWT `sub` == userId) or ADMIN — others → 403 |
+| `GET /api/notifications/{id}`, `PATCH /api/notifications/{id}/read` | owner or ADMIN — non-owner → 403 |
 | `/api/users/**`, `/api/teams/**` | ADMIN, AGENT |
 | actuator, scalar, api-docs | public |
 
@@ -194,9 +197,10 @@ Run the full cycle with:
 
 The launcher:
 1. Brings up the stack: `docker compose up -d --build` (idempotent — no-op if already up)
-2. Waits until all 5 services report `/actuator/health` (bounded ~180s, 5s interval)
-3. Runs the suite: `./mvnw -pl e2e-tests test -DskipE2E=false`
-4. Leaves the stack running so `./scripts/smoke-test.sh` still works after (tear down with `docker compose down`)
+2. Waits until all 5 services report `/actuator/health` (bounded ~180s, 5s interval; one restart-and-recheck recovery pass handles cold-start config/discovery races)
+3. Routing-readiness gate: waits for all 4 application services to register in Eureka, then probes the gateway routes until they resolve — 3 consecutive clean rounds, no 000/5xx, so the circuit breakers cannot flip to open right after the gate passes (bounded 120s)
+4. Runs the suite: `./mvnw -pl e2e-tests test -DskipE2E=false`
+5. Leaves the stack running so `./scripts/smoke-test.sh` still works after (tear down with `docker compose down`)
 
 The module participates in the reactor but **never runs in the fast suite**:
 surefire is gated by the `skipE2E` property (default `true`), so
@@ -214,6 +218,7 @@ Tests:
 | `AuthE2E` | Keycloak password grant returns 200 + non-empty `access_token` |
 | `HealthE2E` | `/actuator/health` returns 200 + `status: UP` for the 5 services |
 | `IncidentFlowE2E` | create incident (unique title) → retrieve (OPEN) → appears in list → assign to first real user → transition to `IN_PROGRESS` → poll notifications until the assignee has ≥1 (60s bound, 2s interval) |
+| `GatewaySecurityE2E` | role matrix: USER creates incidents (200/201) but cannot list them or read the user directory (403); AGENT lists incidents + user directory (200); notification owner-checks ignore spoofed `X-User-Id` (403); `/eureka/**` is no longer exposed through the gateway (401/404) |
 
 Config surface (all optional; same defaults as `docker-compose.yml` and the
 smoke test): `GATEWAY_URL`, `INCIDENT_URL`, `NOTIFICATION_URL`, `USER_URL`,
@@ -300,8 +305,6 @@ builds it from this submodule via `docker/config-server.Dockerfile`.
 - `RequestLoggingFilter` (order -90) — logs method/path/status/duration
 - `RateLimitFilter` (order -80) — token bucket per client IP
 
-Slim test coverage is pending (see project structure).
-
 ---
 
 ### incident-service
@@ -317,17 +320,23 @@ Slim test coverage is pending (see project structure).
 | Health endpoint | http://localhost:8081/actuator/health |
 | API docs | http://localhost:8081/scalar |
 
-**Architecture**: Layered (controller → service → repository)
+**Architecture**: Layered (controller → service → repository); the `Incident`
+JPA entity is a **self-validating rich domain model** that owns its invariants
+and mutation behavior (no public setters):
+- `Incident.open(title, description, priority)` — blessed creation path (status `OPEN`)
+- `assignTo(assigneeId, teamId)` — assignment
+- `changeStatus(newStatus)` — lifecycle transition, validated against internal rules
 - `controller/` — `IncidentController`, `GlobalExceptionHandler`
-- `service/` — `IncidentService`, `IncidentStateMachine`, `OutboxPoller`
+- `service/` — `IncidentService`, `OutboxPoller`
 - `repository/` — Spring Data JPA repositories
-- `entity/` — `Incident`, `OutboxEvent`, enums
+- `entity/` — `Incident`, `OutboxEvent`
+- `enums/` — `IncidentStatus`, `IncidentPriority`, `IncidentEvent`
 - `messaging/` — `RabbitMqConfig`, `RabbitMqEventPublisher`
 - `client/` — Feign client for the User Service
 
 **Event flow**: mutations persist an `OutboxEvent` in the same transaction (transactional outbox) → `OutboxPoller` (every 5s) forwards unpublished events to RabbitMQ.
 
-**State machine**: `OPEN → IN_PROGRESS → RESOLVED → CLOSED` (with `RESOLVED → OPEN` reopen). Enforced in `IncidentStateMachine`.
+**State machine**: `OPEN → IN_PROGRESS → RESOLVED → CLOSED` (with `RESOLVED → OPEN` reopen). Enforced inside `Incident.changeStatus(...)` — invalid transitions throw `IllegalStateException`.
 
 **Key config** (overridable via env vars):
 | Env var | Default | Description |
@@ -363,7 +372,8 @@ Slim test coverage is pending (see project structure).
 - `service/` — `NotificationRoutingService`
 - `messaging/` — `IncidentEventListener` (@RabbitListener with idempotency), `RabbitMqConfig`
 - `repository/` — Spring Data MongoDB repositories
-- `entity/` — `Notification`, `ProcessedEvent`, enums
+- `entity/` — `Notification`, `ProcessedEvent`
+- `enums/` — `NotificationStatus`, `NotificationType`
 - `notifier/` — `EmailNotificationSender`
 
 **Event flow**: `IncidentEventListener` consumes → dedupes via `ProcessedEvent` → resolves targets via `NotificationRoutingService` → persists `Notification` → sends via `NotificationSender`.
