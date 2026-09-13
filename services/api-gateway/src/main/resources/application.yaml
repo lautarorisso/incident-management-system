@@ -5,7 +5,14 @@ spring:
   application:
     name: api-gateway
   config:
-    import: "optional:configserver:"
+    import:
+      - "optional:configserver:"
+      # Imported AFTER the config server so it takes precedence over it: the
+      # config-server's api-gateway.yaml pins app.rate-limit to 10 req/5s,
+      # which the E2E lifecycle + notification polling bursts past (429s,
+      # flaky suite). This override keeps the runtime rate limit in this
+      # module instead of the config-server submodule.
+      - "optional:classpath:rate-limit-overrides.yaml"
   cloud:
     config:
       discovery:
@@ -77,7 +84,12 @@ management:
 
 app:
   rate-limit:
-    limit-for-period: 10
+    # 50 req / 5s window per client: the E2E incident lifecycle
+    # (create + retrieve + assign + transition) plus notification polling
+    # bursts past 10 req/5s and got 429s, making the suite flaky. The
+    # classpath override (rate-limit-overrides.yaml) applies the same value
+    # when config-server config is imported (later import wins).
+    limit-for-period: 50
     refresh-period: 5s
 
 scalar:

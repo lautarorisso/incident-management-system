@@ -1,0 +1,10 @@
+# Rate-limit override, imported AFTER optional:configserver: in application.yaml
+# so it takes precedence over the config server. The config-server's
+# api-gateway.yaml pins app.rate-limit to 10 req/5s, which the E2E incident
+# lifecycle (create + retrieve + assign + transition) plus notification polling
+# bursts past — 429s made the suite flaky. Keep in sync with the app.rate-limit
+# block in application.yaml.
+app:
+  rate-limit:
+    limit-for-period: 50
+    refresh-period: 5s

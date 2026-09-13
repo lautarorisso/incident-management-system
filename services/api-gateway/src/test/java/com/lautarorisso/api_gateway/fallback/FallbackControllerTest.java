@@ -58,6 +58,47 @@ class FallbackControllerTest {
     }
 
     @Test
+    void incidentsFallbackShouldReturnServiceUnavailableForPost() {
+        webTestClient.post()
+                .uri("/fallback/incidents")
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
+                .expectBody()
+                .jsonPath("$.service").isEqualTo("incident-service")
+                .jsonPath("$.status").isEqualTo("CIRCUIT_OPEN")
+                .jsonPath("$.message").exists()
+                .jsonPath("$.timestamp").exists();
+    }
+
+    @Test
+    void incidentsFallbackShouldReturnServiceUnavailableForPut() {
+        webTestClient.put()
+                .uri("/fallback/incidents")
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
+                .expectBody()
+                .jsonPath("$.service").isEqualTo("incident-service")
+                .jsonPath("$.status").isEqualTo("CIRCUIT_OPEN")
+                .jsonPath("$.message").exists()
+                .jsonPath("$.timestamp").exists();
+    }
+
+    @Test
+    void incidentsFallbackShouldReturnServiceUnavailableForDelete() {
+        webTestClient.delete()
+                .uri("/fallback/incidents")
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
+                .expectBody()
+                .jsonPath("$.service").isEqualTo("incident-service")
+                .jsonPath("$.status").isEqualTo("CIRCUIT_OPEN")
+                .jsonPath("$.message").exists()
+                .jsonPath("$.timestamp").exists();
+    }
+
+    @Test
     void unknownServiceFallbackShouldReturnServiceUnavailable() {
         webTestClient.get()
                 .uri("/fallback/unknown")
