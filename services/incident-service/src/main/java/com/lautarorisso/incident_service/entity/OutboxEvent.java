@@ -39,6 +39,12 @@ public class OutboxEvent {
     @Column(nullable = false)
     private boolean published;
 
+    @Column(nullable = false)
+    private int attempts;
+
+    @Column(name = "last_error", columnDefinition = "TEXT")
+    private String lastError;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 }

@@ -390,8 +390,8 @@ class IncidentEntityTest extends AbstractPostgresTestBase {
         outboxRepo.save(e1);
         outboxRepo.save(e2);
 
-        assertEquals(1, outboxRepo.findByPublishedFalse().size());
-        assertFalse(outboxRepo.findByPublishedFalse().get(0).isPublished());
+        assertEquals(1, outboxRepo.findByPublishedFalseAndAttemptsLessThan(5).size());
+        assertFalse(outboxRepo.findByPublishedFalseAndAttemptsLessThan(5).get(0).isPublished());
     }
 
     @Test

@@ -11,5 +11,5 @@ import java.util.UUID;
  */
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
 
-    List<OutboxEvent> findByPublishedFalse();
+    List<OutboxEvent> findByPublishedFalseAndAttemptsLessThan(int maxAttempts);
 }

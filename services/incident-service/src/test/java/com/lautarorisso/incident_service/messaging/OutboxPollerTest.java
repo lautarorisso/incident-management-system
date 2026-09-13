@@ -30,6 +30,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OutboxPollerTest {
 
+    private static final int MAX_ATTEMPTS = 5;
+
     @Mock
     private OutboxEventRepository outboxEventRepository;
 
@@ -61,7 +63,7 @@ class OutboxPollerTest {
         event.setPayload("{\"incidentId\":\"" + incidentId + "\",\"title\":\"Test\",\"status\":\"OPEN\",\"priority\":\"HIGH\"}");
         event.setPublished(false);
         event.setCreatedAt(Instant.now());
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(event));
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of(event));
 
         poller.processOutbox();
 
@@ -89,7 +91,7 @@ class OutboxPollerTest {
         event2.setPayload("{}");
         event2.setPublished(false);
         event2.setCreatedAt(Instant.now());
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(event1, event2));
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of(event1, event2));
 
         poller.processOutbox();
 
@@ -99,7 +101,7 @@ class OutboxPollerTest {
 
     @Test
     void shouldDoNothingWhenNoUnpublishedEvents() {
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of());
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of());
 
         poller.processOutbox();
 
@@ -117,7 +119,7 @@ class OutboxPollerTest {
         event.setPayload("{\"incidentId\":\"" + incidentId + "\"}");
         event.setPublished(false);
         event.setCreatedAt(Instant.now());
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(event));
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of(event));
 
         poller.processOutbox();
 
@@ -151,12 +153,16 @@ class OutboxPollerTest {
         goodEvent.setPublished(false);
         goodEvent.setCreatedAt(Instant.now());
 
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(badEvent, goodEvent));
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of(badEvent, goodEvent));
 
         poller.processOutbox();
 
         verify(eventPublisher).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
-        verify(outboxEventRepository, never()).save(badEvent);
+        // the bad event is saved again, but only to record the failure (attempts + lastError)
+        verify(outboxEventRepository).save(badEvent);
+        assertThat(badEvent.getAttempts()).isEqualTo(1);
+        assertThat(badEvent.getLastError()).isNotBlank();
+        assertThat(badEvent.isPublished()).isFalse();
         verify(outboxEventRepository).save(goodEvent);
     }
 
@@ -181,16 +187,77 @@ class OutboxPollerTest {
         event2.setPublished(false);
         event2.setCreatedAt(Instant.now());
 
-        when(outboxEventRepository.findByPublishedFalse()).thenReturn(List.of(event1, event2));
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS)).thenReturn(List.of(event1, event2));
         doThrow(new RuntimeException("RabbitMQ connection lost"))
                 .when(eventPublisher).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
 
         poller.processOutbox();
 
-        // event1 failed to publish, should NOT be marked as published
-        verify(outboxEventRepository, never()).save(event1);
+        // event1 failed to publish, should NOT be marked as published — but the
+        // failure is recorded so the retry budget governs the next attempt
+        verify(outboxEventRepository).save(event1);
+        assertThat(event1.getAttempts()).isEqualTo(1);
+        assertThat(event1.getLastError()).isEqualTo("RabbitMQ connection lost");
+        assertThat(event1.isPublished()).isFalse();
         // event2 should still be processed and published
         verify(eventPublisher).publish(eq(IncidentEvent.INCIDENT_ASSIGNED), any());
         verify(outboxEventRepository).save(event2);
+    }
+
+    @Test
+    void failedPublishIncrementsAttemptsAndRecordsLastError() {
+        UUID incidentId = UUID.randomUUID();
+        OutboxEvent event = new OutboxEvent();
+        event.setId(UUID.randomUUID());
+        event.setAggregateId(incidentId);
+        event.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        event.setPayload("{\"incidentId\":\"" + incidentId + "\"}");
+        event.setPublished(false);
+        event.setAttempts(2);
+        event.setCreatedAt(Instant.now());
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS))
+                .thenReturn(List.of(event));
+        doThrow(new RuntimeException("Broker unreachable"))
+                .when(eventPublisher).publish(eq(IncidentEvent.INCIDENT_CREATED), any());
+
+        poller.processOutbox();
+
+        assertThat(event.getAttempts()).isEqualTo(3);
+        assertThat(event.getLastError()).isEqualTo("Broker unreachable");
+        assertThat(event.isPublished()).isFalse();
+        verify(outboxEventRepository).save(event);
+    }
+
+    @Test
+    void pollsOnlyEventsBelowMaxAttempts() {
+        poller.processOutbox();
+
+        // The poller must never select events that exhausted their retry budget:
+        // the repository query applies the ceiling, not the poller loop.
+        verify(outboxEventRepository).findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS);
+    }
+
+    @Test
+    void successfulPublishLeavesAttemptsUntouchedAndSetsPublished() {
+        UUID incidentId = UUID.randomUUID();
+        OutboxEvent event = new OutboxEvent();
+        event.setId(UUID.randomUUID());
+        event.setAggregateId(incidentId);
+        event.setEventType(IncidentEvent.INCIDENT_CREATED.name());
+        event.setPayload("{\"incidentId\":\"" + incidentId + "\"}");
+        event.setPublished(false);
+        event.setAttempts(3);
+        event.setLastError("previous failure");
+        event.setCreatedAt(Instant.now());
+        when(outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS))
+                .thenReturn(List.of(event));
+
+        poller.processOutbox();
+
+        assertThat(event.isPublished()).isTrue();
+        // a success neither clears history nor resets the counter — it just publishes
+        assertThat(event.getAttempts()).isEqualTo(3);
+        assertThat(event.getLastError()).isEqualTo("previous failure");
+        verify(outboxEventRepository).save(event);
     }
 }

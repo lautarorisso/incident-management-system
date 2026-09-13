@@ -21,24 +21,32 @@ import java.util.Map;
  * to RabbitMQ via the {@link RabbitMqEventPublisher}, and marks them as published.
  * <p>
  * Implements the transactional outbox pattern for reliable event delivery.
+ * <p>
+ * Poison-pill handling: every failed publish increments {@code attempts} and
+ * records {@code lastError}, so a persistently failing event is retried at most
+ * {@value #MAX_ATTEMPTS} times. Events that reach {@code MAX_ATTEMPTS} simply stop
+ * being selected by the repository query — a DB-side dead-letter queue: they stay
+ * {@code unpublished} and remain inspectable in the outbox_events table.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OutboxPoller {
 
+    private static final int MAX_ATTEMPTS = 5;
+
     private final OutboxEventRepository outboxEventRepository;
     private final RabbitMqEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
     /**
-     * Processes all unpublished outbox events.
-     * Runs every 5 seconds with an initial delay of 10 seconds after startup.
+     * Processes all unpublished outbox events that have not exhausted their retry
+     * budget. Runs every 5 seconds with an initial delay of 10 seconds after startup.
      */
     @Scheduled(fixedDelay = 5000, initialDelay = 10000)
     @Transactional
     public void processOutbox() {
-        List<OutboxEvent> unpublished = outboxEventRepository.findByPublishedFalse();
+        List<OutboxEvent> unpublished = outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(MAX_ATTEMPTS);
         if (unpublished.isEmpty()) {
             return;
         }
@@ -60,11 +68,16 @@ public class OutboxPoller {
                 event.setPublished(true);
                 outboxEventRepository.save(event);
 
-                log.debug("Published outbox event {} for aggregate {}",
+                log.info("Published outbox event {} for aggregate {}",
                         event.getEventType(), event.getAggregateId());
             } catch (Exception e) {
-                log.error("Failed to publish outbox event {}: {}",
-                        event.getId(), e.getMessage(), e);
+                // A failing event must not abort the batch: record the failure and
+                // let the retry budget govern how often it is attempted again.
+                event.setAttempts(event.getAttempts() + 1);
+                event.setLastError(e.getMessage());
+                outboxEventRepository.save(event);
+                log.warn("Failed to publish outbox event {} (attempt {} of {}): {}",
+                        event.getId(), event.getAttempts(), MAX_ATTEMPTS, e.getMessage());
             }
         }
     }

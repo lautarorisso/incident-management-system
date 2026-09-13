@@ -170,7 +170,7 @@ class IncidentServiceIntegrationTest extends AbstractPostgresTestBase {
     void shouldPublishOutboxEventsOnCreate() {
         incidentService.createIncident("Outbox test", "Testing outbox", IncidentPriority.HIGH);
 
-        var unpublished = outboxEventRepository.findByPublishedFalse();
+        var unpublished = outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(5);
         assertEquals(1, unpublished.size());
         assertEquals(IncidentEvent.INCIDENT_CREATED.name(), unpublished.get(0).getEventType());
     }
@@ -181,7 +181,7 @@ class IncidentServiceIntegrationTest extends AbstractPostgresTestBase {
 
         incidentService.assignIncident(created.getId(), assigneeId, teamId);
 
-        var unpublished = outboxEventRepository.findByPublishedFalse();
+        var unpublished = outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(5);
         assertEquals(2, unpublished.size());
         assertEquals(IncidentEvent.INCIDENT_CREATED.name(), unpublished.get(0).getEventType());
         assertEquals(IncidentEvent.INCIDENT_ASSIGNED.name(), unpublished.get(1).getEventType());
