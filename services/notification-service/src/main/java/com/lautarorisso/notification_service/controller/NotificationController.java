@@ -81,16 +81,26 @@ public class NotificationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notification found",
                     content = @Content(schema = @Schema(implementation = NotificationResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Not the notification owner and not an admin"),
             @ApiResponse(responseCode = "404", description = "Notification not found")
     })
     public ResponseEntity<NotificationResponse> getNotificationById(
             @Parameter(description = "Notification ID", required = true)
-            @PathVariable UUID id) {
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
 
-        return notificationRepository.findById(id)
-                .map(this::toResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Optional<Notification> found = notificationRepository.findById(id);
+        if (found.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Notification notification = found.get();
+
+        if (!isOwnerOrAdmin(jwt, authentication, notification.getUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return ResponseEntity.ok(toResponse(notification));
     }
 
     @PatchMapping("/{id}/read")
@@ -99,18 +109,26 @@ public class NotificationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notification marked as read",
                     content = @Content(schema = @Schema(implementation = NotificationResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Not the notification owner and not an admin"),
             @ApiResponse(responseCode = "404", description = "Notification not found")
     })
     public ResponseEntity<NotificationResponse> markAsRead(
             @Parameter(description = "Notification ID", required = true)
-            @PathVariable UUID id) {
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
 
         Optional<Notification> found = notificationRepository.findById(id);
         if (found.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
+        Notification notification = found.get();
 
-        Notification updated = found.get().withStatus(NotificationStatus.READ);
+        if (!isOwnerOrAdmin(jwt, authentication, notification.getUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        Notification updated = notification.withStatus(NotificationStatus.READ);
         notificationRepository.save(updated);
 
         return ResponseEntity.ok(toResponse(updated));

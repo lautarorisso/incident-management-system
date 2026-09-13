@@ -19,6 +19,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -107,10 +109,33 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
-                        .with(jwt()))
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(notificationId.toString()))
                 .andExpect(jsonPath("$.title").value("Test notification"));
+    }
+
+    @Test
+    void getNotificationByIdReturns403WhenNotOwner() throws Exception {
+        UUID notificationId = UUID.randomUUID();
+        Notification notification = Notification.builder()
+                .id(notificationId)
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(UUID.randomUUID())
+                .incidentId(UUID.randomUUID())
+                .title("Test notification")
+                .message("Test message")
+                .status(NotificationStatus.UNREAD)
+                .createdAt(Instant.now())
+                .build();
+
+        when(notificationRepository.findById(notificationId))
+                .thenReturn(Optional.of(notification));
+
+        mockMvc.perform(get("/api/notifications/{id}", notificationId)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -145,9 +170,34 @@ class NotificationControllerTest {
 
         mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
-                        .with(jwt()))
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READ"));
+    }
+
+    @Test
+    void markAsReadReturns403WhenNotOwner() throws Exception {
+        UUID notificationId = UUID.randomUUID();
+        Notification notification = Notification.builder()
+                .id(notificationId)
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(UUID.randomUUID())
+                .incidentId(UUID.randomUUID())
+                .title("Test notification")
+                .message("Test message")
+                .status(NotificationStatus.UNREAD)
+                .createdAt(Instant.now())
+                .build();
+
+        when(notificationRepository.findById(notificationId))
+                .thenReturn(Optional.of(notification));
+
+        mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt()))
+                .andExpect(status().isForbidden());
+
+        verify(notificationRepository, never()).save(any());
     }
 
     @Test
@@ -206,10 +256,11 @@ class NotificationControllerTest {
     @Test
     void byIdEndpointShouldExposeMessageField() throws Exception {
         UUID notificationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
         Notification notification = Notification.builder()
                 .id(notificationId)
                 .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(UUID.randomUUID())
+                .userId(userId)
                 .incidentId(UUID.randomUUID())
                 .title("Test")
                 .message("Full message content")
@@ -222,7 +273,7 @@ class NotificationControllerTest {
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
-                        .with(jwt()))
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Full message content"))
                 .andExpect(jsonPath("$.userId").exists())
