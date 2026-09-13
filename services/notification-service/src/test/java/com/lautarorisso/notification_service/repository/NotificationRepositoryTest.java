@@ -132,4 +132,27 @@ class NotificationRepositoryTest extends AbstractMongoTestBase {
         assertTrue(found.isPresent());
         assertEquals(eventId, found.get().getEventId());
     }
+
+    @Test
+    void existsByEventIdAndUserIdMatchesOnlySameUserAndEventId() {
+        String eventId = UUID.randomUUID().toString();
+        UUID userId = UUID.randomUUID();
+
+        notificationRepository.save(Notification.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(userId)
+                .incidentId(UUID.randomUUID())
+                .title("Dedup key test")
+                .message("msg")
+                .eventId(eventId)
+                .createdAt(Instant.now())
+                .build());
+
+        assertTrue(notificationRepository.existsByEventIdAndUserId(eventId, userId));
+        assertFalse(notificationRepository.existsByEventIdAndUserId(eventId, UUID.randomUUID()));
+        assertFalse(notificationRepository.existsByEventIdAndUserId(UUID.randomUUID().toString(), userId));
+        // legacy documents without an eventId must never match the pre-check
+        assertFalse(notificationRepository.existsByEventIdAndUserId(null, userId));
+    }
 }

@@ -319,4 +319,101 @@ class IncidentEventListenerTest {
                 n.getMessage().contains(incidentId) &&
                  n.getType() == NotificationType.INCIDENT_STATUS_CHANGED));
     }
+
+    @Test
+    void redeliveryAfterPartialCompletionDoesNotDuplicateExistingNotification() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        // No dedup row yet (a crash prevented the final save), but the user's
+        // notification was already created during the partial completion.
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(notificationRepository.existsByEventIdAndUserId(eventId, assigneeId)).thenReturn(true);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        listener.handleIncidentEvent(event);
+
+        // No new notification is created — the per-user pre-check bounds the duplicate.
+        verify(notificationRepository, never()).save(any());
+        // ... but the event IS now marked processed, completing the delivery.
+        verify(processedEventRepository).save(processedEventCaptor.capture());
+        assertEquals(eventId, processedEventCaptor.getValue().getEventId());
+    }
+
+    @Test
+    void failedFirstAttemptLeavesNoDedupRowAndSecondAttemptCreatesExactlyOneNotification() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        // First attempt fails mid-processing BEFORE creating any notification
+        // (target resolution blows up after the type resolved). No dedup row is written.
+        doThrow(new RuntimeException("broker hiccup")).when(routingService).resolveTargets(event);
+        assertThrows(RuntimeException.class, () -> listener.handleIncidentEvent(event));
+        verify(notificationRepository, never()).save(any());
+        verify(processedEventRepository, never()).save(any());
+
+        // Redelivery: second attempt completes, creating exactly one notification
+        // (UNREAD + SENT saves) and finally the dedup row. doReturn bypasses the
+        // active throw-stub (a when() re-stub would invoke the method and throw).
+        doReturn(Set.of(assigneeId)).when(routingService).resolveTargets(event);
+
+        listener.handleIncidentEvent(event);
+
+        verify(notificationRepository, times(2)).save(argThat(n ->
+                n.getUserId().equals(assigneeId) &&
+                 n.getType() == NotificationType.INCIDENT_ASSIGNED));
+        verify(processedEventRepository).save(processedEventCaptor.capture());
+        assertEquals(eventId, processedEventCaptor.getValue().getEventId());
+    }
+
+    @Test
+    void legacyEventWithoutEventIdCreatesNotificationWithoutEventIdField() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        Map<String, Object> legacyEvent = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventIdFor(incidentId, "INCIDENT_ASSIGNED")))
+                .thenReturn(false);
+        when(routingService.resolveTargets(legacyEvent)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        listener.handleIncidentEvent(legacyEvent);
+
+        // Legacy events skip the per-user pre-check (no key) and store no eventId
+        verify(notificationRepository, times(2)).save(argThat(n ->
+                n.getUserId().equals(assigneeId) && n.getEventId() == null));
+        verify(processedEventRepository).save(processedEventCaptor.capture());
+        assertEquals(eventIdFor(incidentId, "INCIDENT_ASSIGNED"), processedEventCaptor.getValue().getEventId());
+    }
 }

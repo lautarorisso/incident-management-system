@@ -43,6 +43,13 @@ public class Notification {
 
     private String message;
 
+    /**
+     * The outbox event id that produced this notification. Nullable: legacy
+     * events published before the eventId stamp existed carry no id. Kept out
+     * of every response DTO — it is a dedup key, not API surface.
+     */
+    private String eventId;
+
     @Builder.Default
     private NotificationStatus status = NotificationStatus.UNREAD;
 
@@ -59,6 +66,7 @@ public class Notification {
                 .incidentId(this.incidentId)
                 .title(this.title)
                 .message(this.message)
+                .eventId(this.eventId)
                 .status(newStatus)
                 .createdAt(this.createdAt)
                 .build();

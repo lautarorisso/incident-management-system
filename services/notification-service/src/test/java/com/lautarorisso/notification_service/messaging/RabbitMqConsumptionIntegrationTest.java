@@ -80,7 +80,10 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
         rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY_ASSIGNED,
                 buildEventPayload(eventId, incidentId, assigneeId.toString()));
 
-        awaitCondition(() -> !notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId).isEmpty());
+        // The listener writes the notification first and the dedup row LAST
+        // (at-least-once ordering), so wait for both before asserting.
+        awaitCondition(() -> !notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId).isEmpty()
+                && processedEventRepository.existsById(eventId));
 
         List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId);
         assertThat(notifications).hasSize(1);
@@ -89,6 +92,7 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
         assertThat(notification.getUserId()).isEqualTo(assigneeId);
         assertThat(notification.getIncidentId()).isEqualTo(UUID.fromString(incidentId));
         assertThat(notification.getStatus()).isIn(NotificationStatus.UNREAD, NotificationStatus.SENT);
+        assertThat(notification.getEventId()).isEqualTo(eventId);
         assertThat(processedEventRepository.existsById(eventId)).isTrue();
     }
 

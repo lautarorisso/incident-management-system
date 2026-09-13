@@ -144,4 +144,37 @@ class NotificationServiceIntegrationTest extends AbstractMongoTestBase {
         assertFalse(processedEventRepository.existsById(eventId),
                 "Should not mark as processed when no notifications created");
     }
+
+    @Test
+    void redeliveryWithoutDedupRowDoesNotDuplicateNotification() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "incidentId", incidentId,
+                "eventId", eventId,
+                "assigneeId", assigneeId.toString(),
+                "changedBy", UUID.randomUUID().toString()
+        );
+
+        // First delivery completes: notification + dedup row.
+        eventListener.handleIncidentEvent(event);
+        assertEquals(1, notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId).size());
+
+        // Simulate a crash between notification creation and the dedup-row write:
+        // the row is gone, so the broker would redeliver the same message.
+        processedEventRepository.deleteById(eventId);
+        assertFalse(processedEventRepository.existsById(eventId));
+
+        // Redelivery: the per-user eventId pre-check finds the existing
+        // notification and must NOT create a second one.
+        eventListener.handleIncidentEvent(event);
+
+        assertEquals(1, notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId).size(),
+                "Redelivery after a partial completion must not duplicate the notification");
+        assertTrue(processedEventRepository.existsById(eventId),
+                "The redelivery must finally write the dedup row");
+    }
 }
