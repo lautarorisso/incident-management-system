@@ -3,13 +3,17 @@ package com.ims.shared.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Base exception handler providing consistent RFC 7807 Problem Detail responses.
@@ -61,6 +65,25 @@ public abstract class BaseGlobalExceptionHandler {
                 .toList();
         problem.setProperty("errors", fieldErrors);
         return problem;
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    protected ProblemDetail handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+        return buildProblemDetail(HttpStatus.BAD_REQUEST,
+                "Required request parameter '" + ex.getParameterName() + "' is not present");
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    protected ProblemDetail handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String requiredType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+        return buildProblemDetail(HttpStatus.BAD_REQUEST,
+                "Parameter '" + ex.getName() + "' expects type " + requiredType
+                        + " but was '" + Objects.toString(ex.getValue()) + "'");
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    protected ProblemDetail handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        return buildProblemDetail(HttpStatus.BAD_REQUEST, "Malformed request body");
     }
 
     @ExceptionHandler(ResponseStatusException.class)
