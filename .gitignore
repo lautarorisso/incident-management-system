@@ -11,6 +11,7 @@ target/
 *.iml
 .project
 .classpath
+.factorypath
 .settings/
 
 # OS
