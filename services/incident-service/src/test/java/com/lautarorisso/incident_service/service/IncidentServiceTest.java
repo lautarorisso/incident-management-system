@@ -1,5 +1,6 @@
 package com.lautarorisso.incident_service.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ims.shared.exception.NotFoundException;
 import com.lautarorisso.incident_service.client.UserServiceClient;
@@ -85,6 +86,10 @@ class IncidentServiceTest {
     private UserDto activeUser(UUID id) {
         return new UserDto(id, UUID.randomUUID(), "jdoe", "John Doe",
                 "jdoe@example.com", true, List.of(), Instant.now(), Instant.now());
+    }
+
+    private JsonNode payloadOf(OutboxEvent outbox) throws Exception {
+        return objectMapper.readTree(outbox.getPayload());
     }
 
     private TeamDto activeTeam(UUID id) {
@@ -337,7 +342,7 @@ class IncidentServiceTest {
     }
 
     @Test
-    void shouldCreateOutboxEventOnAssign() {
+    void shouldCreateOutboxEventOnAssign() throws Exception {
         UUID incidentId = UUID.randomUUID();
         UUID assigneeId = UUID.randomUUID();
 
@@ -358,6 +363,7 @@ class IncidentServiceTest {
         verify(outboxEventRepository).save(outboxCaptor.capture());
         OutboxEvent outbox = outboxCaptor.getValue();
         assertEquals(IncidentEvent.INCIDENT_ASSIGNED.name(), outbox.getEventType());
+        assertEquals("jdoe@example.com", payloadOf(outbox).get("assigneeEmail").asText());
     }
 
     // --- transitionIncident ---
@@ -425,7 +431,7 @@ class IncidentServiceTest {
     }
 
     @Test
-    void shouldCreateOutboxEventOnTransition() {
+    void shouldCreateOutboxEventOnTransition() throws Exception {
         UUID incidentId = UUID.randomUUID();
 
         Incident existing = Incident.builder()
@@ -444,6 +450,68 @@ class IncidentServiceTest {
         verify(outboxEventRepository).save(outboxCaptor.capture());
         OutboxEvent outbox = outboxCaptor.getValue();
         assertEquals(IncidentEvent.INCIDENT_STATUS_CHANGED.name(), outbox.getEventType());
+        // No assignee on the incident -> no email denormalized into the payload.
+        assertTrue(payloadOf(outbox).get("assigneeEmail").isNull());
+    }
+
+    @Test
+    void shouldResolveAssigneeEmailOnTransitionWhenAssigneeExists() throws Exception {
+        UUID incidentId = UUID.randomUUID();
+        UUID assigneeId = UUID.randomUUID();
+
+        Incident existing = Incident.builder()
+                .id(incidentId)
+                .title("To transition")
+                .status(IncidentStatus.OPEN)
+                .priority(IncidentPriority.MEDIUM)
+                .assigneeId(assigneeId)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(incidentRepository.findById(incidentId)).thenReturn(Optional.of(existing));
+        when(userServiceClient.findUserById(assigneeId)).thenReturn(activeUser(assigneeId));
+
+        incidentService.transitionIncident(incidentId, IncidentStatus.IN_PROGRESS);
+
+        verify(outboxEventRepository).save(outboxCaptor.capture());
+        assertEquals("jdoe@example.com",
+                payloadOf(outboxCaptor.getValue()).get("assigneeEmail").asText());
+    }
+
+    @Test
+    void shouldDegradeToNullEmailWhenAssigneeResolutionFailsOnTransition() throws Exception {
+        UUID incidentId = UUID.randomUUID();
+        UUID assigneeId = UUID.randomUUID();
+
+        Incident existing = Incident.builder()
+                .id(incidentId)
+                .title("To transition")
+                .status(IncidentStatus.OPEN)
+                .priority(IncidentPriority.MEDIUM)
+                .assigneeId(assigneeId)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        when(incidentRepository.findById(incidentId)).thenReturn(Optional.of(existing));
+        when(userServiceClient.findUserById(assigneeId)).thenThrow(feignNotFound());
+
+        // A failed assignee lookup must never fail the transition.
+        Incident result = assertDoesNotThrow(() ->
+                incidentService.transitionIncident(incidentId, IncidentStatus.IN_PROGRESS));
+        assertEquals(IncidentStatus.IN_PROGRESS, result.getStatus());
+
+        verify(outboxEventRepository).save(outboxCaptor.capture());
+        assertTrue(payloadOf(outboxCaptor.getValue()).get("assigneeEmail").isNull());
+    }
+
+    @Test
+    void shouldCreateOutboxEventWithNullEmailOnCreate() throws Exception {
+        incidentService.createIncident("Test", "Desc", IncidentPriority.HIGH);
+
+        verify(outboxEventRepository).save(outboxCaptor.capture());
+        assertTrue(payloadOf(outboxCaptor.getValue()).get("assigneeEmail").isNull());
     }
 
     // --- getIncident ---

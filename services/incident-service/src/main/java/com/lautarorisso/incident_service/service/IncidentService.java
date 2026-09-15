@@ -14,6 +14,7 @@ import com.lautarorisso.incident_service.repository.OutboxEventRepository;
 import com.lautarorisso.incident_service.client.UserServiceClient;
 import com.ims.shared.dto.UserDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,7 @@ import java.util.UUID;
  * Application-layer service consolidating all Incident use cases:
  * create, assign, transition, get, and list.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IncidentService {
@@ -46,7 +48,7 @@ public class IncidentService {
         Incident incident = Incident.open(title, description, priority);
 
         Incident saved = incidentRepository.save(incident);
-        publishOutbox(IncidentEvent.INCIDENT_CREATED, saved);
+        publishOutbox(IncidentEvent.INCIDENT_CREATED, saved, null);
 
         return saved;
     }
@@ -74,7 +76,7 @@ public class IncidentService {
         incident.assignTo(assigneeId, teamId);
 
         Incident saved = incidentRepository.save(incident);
-        publishOutbox(IncidentEvent.INCIDENT_ASSIGNED, saved);
+        publishOutbox(IncidentEvent.INCIDENT_ASSIGNED, saved, user.email());
 
         return saved;
     }
@@ -93,7 +95,8 @@ public class IncidentService {
         incident.changeStatus(newStatus);
 
         Incident saved = incidentRepository.save(incident);
-        publishOutbox(IncidentEvent.INCIDENT_STATUS_CHANGED, saved);
+        String assigneeEmail = resolveAssigneeEmail(incident.getAssigneeId());
+        publishOutbox(IncidentEvent.INCIDENT_STATUS_CHANGED, saved, assigneeEmail);
 
         return saved;
     }
@@ -133,18 +136,37 @@ public class IncidentService {
     // --- outbox ---
 
     @Transactional
-    protected void publishOutbox(IncidentEvent eventType, Incident incident) {
+    protected void publishOutbox(IncidentEvent eventType, Incident incident, String assigneeEmail) {
         OutboxEvent outboxEvent = new OutboxEvent();
         outboxEvent.setId(UUID.randomUUID());
         outboxEvent.setAggregateId(incident.getId());
         outboxEvent.setEventType(eventType.name());
-        outboxEvent.setPayload(buildPayload(incident));
+        outboxEvent.setPayload(buildPayload(incident, assigneeEmail));
         outboxEvent.setPublished(false);
         outboxEvent.setCreatedAt(Instant.now());
         outboxEventRepository.save(outboxEvent);
     }
 
-    private String buildPayload(Incident incident) {
+    /**
+     * Resolves the assignee's email for the event payload. A failed user lookup
+     * must NEVER fail the transition: the email is a denormalized convenience
+     * for the notification listener (which has no JWT of its own), so a
+     * resolution failure degrades to a null email instead. When the incident
+     * has no assignee there is nothing to resolve.
+     */
+    private String resolveAssigneeEmail(UUID assigneeId) {
+        if (assigneeId == null) {
+            return null;
+        }
+        try {
+            return userServiceClient.findUserById(assigneeId).email();
+        } catch (Exception e) {
+            log.warn("Could not resolve assignee email for user {}: {}", assigneeId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String buildPayload(Incident incident, String assigneeEmail) {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("incidentId", incident.getId().toString());
         node.put("title", incident.getTitle());
@@ -159,6 +181,11 @@ public class IncidentService {
             node.put("teamId", incident.getTeamId().toString());
         } else {
             node.putNull("teamId");
+        }
+        if (assigneeEmail != null) {
+            node.put("assigneeEmail", assigneeEmail);
+        } else {
+            node.putNull("assigneeEmail");
         }
         try {
             return objectMapper.writeValueAsString(node);

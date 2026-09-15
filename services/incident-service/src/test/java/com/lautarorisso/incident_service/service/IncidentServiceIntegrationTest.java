@@ -186,4 +186,25 @@ class IncidentServiceIntegrationTest extends AbstractPostgresTestBase {
         assertEquals(IncidentEvent.INCIDENT_CREATED.name(), unpublished.get(0).getEventType());
         assertEquals(IncidentEvent.INCIDENT_ASSIGNED.name(), unpublished.get(1).getEventType());
     }
+
+    @Test
+    void shouldIncludeAssigneeEmailInTransitionOutboxPayload() {
+        Incident created = incidentService.createIncident(
+                "Email payload test", "Desc", IncidentPriority.MEDIUM);
+        incidentService.assignIncident(created.getId(), assigneeId, teamId);
+        incidentService.transitionIncident(created.getId(), IncidentStatus.IN_PROGRESS);
+
+        var unpublished = outboxEventRepository.findByPublishedFalseAndAttemptsLessThan(5);
+        assertEquals(3, unpublished.size());
+        assertEquals(IncidentEvent.INCIDENT_CREATED.name(), unpublished.get(0).getEventType());
+        assertEquals(IncidentEvent.INCIDENT_ASSIGNED.name(), unpublished.get(1).getEventType());
+        assertEquals(IncidentEvent.INCIDENT_STATUS_CHANGED.name(), unpublished.get(2).getEventType());
+
+        // The status-changed event must carry the real recipient email resolved
+        // from the incident's assignee (Fix 1).
+        String payload = unpublished.get(2).getPayload();
+        assertNotNull(payload);
+        assertTrue(payload.contains("\"assigneeEmail\":\"jdoe@example.com\""),
+                "Expected assigneeEmail in status-changed payload but was: " + payload);
+    }
 }
