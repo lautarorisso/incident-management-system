@@ -13,6 +13,9 @@ import java.util.UUID;
  * <p>
  * Given an incident event (event type + metadata), determines which users
  * should receive a notification and what type of notification to create.
+ * Event-to-type resolution is delegated to
+ * {@link NotificationType#fromEventType} — no event-name string literals
+ * remain in this service.
  */
 @Service
 public class NotificationRoutingService {
@@ -25,14 +28,13 @@ public class NotificationRoutingService {
      */
     public Set<UUID> resolveTargets(Map<String, Object> event) {
         String eventType = (String) event.get("eventType");
-        if (eventType == null) {
+        NotificationType type = NotificationType.fromEventType(eventType);
+        if (type == null) {
             return Collections.emptySet();
         }
 
-        return switch (eventType) {
-            case "INCIDENT_ASSIGNED", "INCIDENT_STATUS_CHANGED" ->
-                    parseUuid(event.get("assigneeId"));
-            default -> Collections.emptySet();
+        return switch (type) {
+            case INCIDENT_ASSIGNED, INCIDENT_STATUS_CHANGED -> parseUuid(event.get("assigneeId"));
         };
     }
 
@@ -49,19 +51,14 @@ public class NotificationRoutingService {
 
     /**
      * Resolves the notification type from an event type string.
+     * <p>
+     * Delegates to {@link NotificationType#fromEventType}.
      *
      * @param eventType the event type string from the message
      * @return the matching NotificationType, or null if unknown
      */
     public NotificationType resolveNotificationType(String eventType) {
-        if (eventType == null) {
-            return null;
-        }
-        return switch (eventType) {
-            case "INCIDENT_ASSIGNED" -> NotificationType.INCIDENT_ASSIGNED;
-            case "INCIDENT_STATUS_CHANGED" -> NotificationType.INCIDENT_STATUS_CHANGED;
-            default -> null;
-        };
+        return NotificationType.fromEventType(eventType);
     }
 
     /**
