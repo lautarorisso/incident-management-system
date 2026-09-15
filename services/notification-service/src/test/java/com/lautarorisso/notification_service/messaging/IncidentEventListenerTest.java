@@ -1,7 +1,8 @@
 package com.lautarorisso.notification_service.messaging;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
 import com.lautarorisso.notification_service.notifier.EmailNotificationSender;
@@ -258,14 +259,18 @@ class IncidentEventListenerTest {
 
         listener.handleIncidentEvent(event);
 
-        // save called twice: UNREAD + FAILED (sender error)
+        // save called twice: UNREAD+PENDING (initial) + UNREAD+FAILED (sender error)
         verify(notificationRepository, times(2)).save(argThat(n ->
                 n.getUserId().equals(assigneeId)));
-        // Verify the FAILED status was saved (not SENT)
+        // Verify the exact (delivery, read) pairs saved: the initial UNREAD
+        // notification (delivery still PENDING at save time) and the FAILED
+        // replacement — never SENT.
         verify(notificationRepository).save(argThat(n ->
-                n.getStatus() == NotificationStatus.FAILED));
+                n.getDeliveryStatus() == NotificationDeliveryStatus.PENDING
+                        && n.getReadStatus() == NotificationReadStatus.UNREAD));
         verify(notificationRepository).save(argThat(n ->
-                n.getStatus() == NotificationStatus.UNREAD));
+                n.getDeliveryStatus() == NotificationDeliveryStatus.FAILED
+                        && n.getReadStatus() == NotificationReadStatus.UNREAD));
     }
 
     @Test
@@ -388,6 +393,57 @@ class IncidentEventListenerTest {
                  n.getType() == NotificationType.INCIDENT_ASSIGNED));
         verify(processedEventRepository).save(processedEventCaptor.capture());
         assertEquals(eventId, processedEventCaptor.getValue().getEventId());
+    }
+
+    @Test
+    void copiesAssigneeEmailFromEventOntoNotification() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString(),
+                "assigneeEmail", "jdoe@example.com"
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        listener.handleIncidentEvent(event);
+
+        verify(notificationRepository, atLeastOnce()).save(argThat(n ->
+                "jdoe@example.com".equals(n.getRecipientEmail())));
+    }
+
+    @Test
+    void legacyEventWithoutAssigneeEmailStoresNullRecipientEmail() {
+        UUID assigneeId = UUID.randomUUID();
+        String incidentId = UUID.randomUUID().toString();
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> event = Map.of(
+                "eventType", "INCIDENT_ASSIGNED",
+                "eventId", eventId,
+                "incidentId", incidentId,
+                "assigneeId", assigneeId.toString()
+        );
+
+        when(processedEventRepository.existsById(eventId)).thenReturn(false);
+        when(routingService.resolveTargets(event)).thenReturn(Set.of(assigneeId));
+        when(routingService.resolveNotificationType("INCIDENT_ASSIGNED"))
+                .thenReturn(NotificationType.INCIDENT_ASSIGNED);
+        when(routingService.buildTitle(NotificationType.INCIDENT_ASSIGNED))
+                .thenReturn("You have been assigned to incident");
+
+        listener.handleIncidentEvent(event);
+
+        verify(notificationRepository, atLeastOnce()).save(argThat(n ->
+                n.getRecipientEmail() == null));
     }
 
     @Test

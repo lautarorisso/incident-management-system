@@ -19,8 +19,11 @@ public record NotificationListItem(
         @Schema(description = "Notification title", example = "You have been assigned to incident")
         String title,
 
+        @Schema(description = "Delivery status", example = "PENDING")
+        String deliveryStatus,
+
         @Schema(description = "Read status", example = "UNREAD")
-        String status,
+        String readStatus,
 
         @Schema(description = "Creation timestamp", example = "2026-07-29T12:00:00Z")
         Instant createdAt

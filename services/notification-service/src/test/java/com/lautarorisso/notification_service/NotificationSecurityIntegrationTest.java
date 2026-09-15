@@ -1,7 +1,7 @@
 package com.lautarorisso.notification_service;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.support.AbstractMongoTestBase;
@@ -71,7 +71,7 @@ class NotificationSecurityIntegrationTest extends AbstractMongoTestBase {
                 .incidentId(UUID.randomUUID())
                 .title("Security test notification")
                 .message("Test message")
-                .status(NotificationStatus.UNREAD)
+                .readStatus(NotificationReadStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build());
     }
@@ -169,7 +169,7 @@ class NotificationSecurityIntegrationTest extends AbstractMongoTestBase {
                 .andExpect(status().isForbidden());
 
         Notification reloaded = notificationRepository.findById(notification.getId()).orElseThrow();
-        assertEquals(NotificationStatus.UNREAD, reloaded.getStatus());
+        assertEquals(NotificationReadStatus.UNREAD, reloaded.getReadStatus());
     }
 
     @Test
@@ -181,9 +181,9 @@ class NotificationSecurityIntegrationTest extends AbstractMongoTestBase {
                         .with(jwt().jwt(builder -> builder.subject(ownerId.toString()))
                                 .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("READ"));
+                .andExpect(jsonPath("$.readStatus").value("READ"));
 
         Notification reloaded = notificationRepository.findById(notification.getId()).orElseThrow();
-        assertEquals(NotificationStatus.READ, reloaded.getStatus());
+        assertEquals(NotificationReadStatus.READ, reloaded.getReadStatus());
     }
 }

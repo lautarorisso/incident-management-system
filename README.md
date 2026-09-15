@@ -399,11 +399,11 @@ and mutation behavior (no public setters):
 
 **Architecture**: Layered (controller → service → repository)
 - `controller/` — `NotificationController`, `GlobalExceptionHandler`
-- `service/` — `NotificationRoutingService`
+- `service/` — `NotificationService`, `NotificationRoutingService`
 - `messaging/` — `IncidentEventListener` (@RabbitListener with idempotency), `RabbitMqConfig`
 - `repository/` — Spring Data MongoDB repositories
 - `entity/` — `Notification`, `ProcessedEvent`
-- `enums/` — `NotificationStatus`, `NotificationType`
+- `enums/` — `NotificationDeliveryStatus`, `NotificationReadStatus`, `NotificationType`
 - `notifier/` — `EmailNotificationSender`
 
 **Event flow**: `IncidentEventListener` consumes → dedupes via `ProcessedEvent` → resolves targets via `NotificationRoutingService` → persists `Notification` → sends via `NotificationSender`.

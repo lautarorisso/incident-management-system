@@ -1,7 +1,8 @@
 package com.lautarorisso.notification_service.repository;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
 import com.lautarorisso.notification_service.support.AbstractMongoTestBase;
@@ -43,7 +44,8 @@ class NotificationRepositoryTest extends AbstractMongoTestBase {
                 .incidentId(UUID.randomUUID())
                 .title("Test notification")
                 .message("Test message")
-                .status(NotificationStatus.UNREAD)
+                .deliveryStatus(NotificationDeliveryStatus.SENT)
+                .readStatus(NotificationReadStatus.READ)
                 .createdAt(Instant.now())
                 .build();
 
@@ -53,7 +55,8 @@ class NotificationRepositoryTest extends AbstractMongoTestBase {
         assertTrue(found.isPresent());
         assertEquals(id, found.get().getId());
         assertEquals("Test notification", found.get().getTitle());
-        assertEquals(NotificationStatus.UNREAD, found.get().getStatus());
+        assertEquals(NotificationDeliveryStatus.SENT, found.get().getDeliveryStatus());
+        assertEquals(NotificationReadStatus.READ, found.get().getReadStatus());
     }
 
     @Test
@@ -78,7 +81,7 @@ class NotificationRepositoryTest extends AbstractMongoTestBase {
     }
 
     @Test
-    void findByUserIdAndStatusFiltersByStatus() {
+    void findByUserIdAndReadStatusFiltersByReadStatus() {
         UUID userId = UUID.randomUUID();
         UUID unreadId = UUID.randomUUID();
         UUID readId = UUID.randomUUID();
@@ -87,20 +90,47 @@ class NotificationRepositoryTest extends AbstractMongoTestBase {
                 .id(unreadId).type(NotificationType.INCIDENT_ASSIGNED)
                 .userId(userId).incidentId(UUID.randomUUID())
                 .title("Unread").message("Unread msg")
-                .status(NotificationStatus.UNREAD)
+                .readStatus(NotificationReadStatus.UNREAD)
                 .createdAt(Instant.now()).build());
 
         notificationRepository.save(Notification.builder()
                 .id(readId).type(NotificationType.INCIDENT_STATUS_CHANGED)
                 .userId(userId).incidentId(UUID.randomUUID())
                 .title("Read").message("Read msg")
-                .status(NotificationStatus.READ)
+                .readStatus(NotificationReadStatus.READ)
                 .createdAt(Instant.now()).build());
 
-        List<Notification> unread = notificationRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, NotificationStatus.UNREAD);
+        List<Notification> unread = notificationRepository.findByUserIdAndReadStatusOrderByCreatedAtDesc(userId, NotificationReadStatus.UNREAD);
 
         assertEquals(1, unread.size());
         assertEquals(unreadId, unread.getFirst().getId());
+    }
+
+    @Test
+    void findByUserIdAndReadStatusIgnoresDeliveryStatus() {
+        UUID userId = UUID.randomUUID();
+        UUID pendingId = UUID.randomUUID();
+
+        // Both "unread": one failed to deliver (FAILED), one pending (PENDING).
+        notificationRepository.save(Notification.builder()
+                .id(pendingId).type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(userId).incidentId(UUID.randomUUID())
+                .title("Pending").message("Pending msg")
+                .deliveryStatus(NotificationDeliveryStatus.FAILED)
+                .readStatus(NotificationReadStatus.UNREAD)
+                .createdAt(Instant.now()).build());
+
+        notificationRepository.save(Notification.builder()
+                .id(UUID.randomUUID()).type(NotificationType.INCIDENT_STATUS_CHANGED)
+                .userId(userId).incidentId(UUID.randomUUID())
+                .title("Second").message("Second msg")
+                .deliveryStatus(NotificationDeliveryStatus.PENDING)
+                .readStatus(NotificationReadStatus.UNREAD)
+                .createdAt(Instant.now()).build());
+
+        List<Notification> unread = notificationRepository.findByUserIdAndReadStatusOrderByCreatedAtDesc(userId, NotificationReadStatus.UNREAD);
+
+        assertEquals(2, unread.size());
     }
 
     @Test

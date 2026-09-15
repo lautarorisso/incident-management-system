@@ -1,9 +1,8 @@
 package com.lautarorisso.notification_service.messaging;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
-import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.entity.ProcessedEvent;
+import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.notifier.EmailNotificationSender;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
@@ -116,7 +115,7 @@ public class IncidentEventListener {
                     .eventId(rawEventId != null ? rawEventId.toString() : null)
                     .title(title)
                     .message(buildMessage(notificationType, incidentId))
-                    .status(NotificationStatus.UNREAD)
+                    .recipientEmail((String) event.get("assigneeEmail"))
                     .createdAt(Instant.now())
                     .build();
 
@@ -129,11 +128,11 @@ public class IncidentEventListener {
             // redelivery cannot fix an email outage (it would only duplicate work).
             try {
                 notificationSender.send(notification);
-                notification = notification.markAsSent();
+                notification = notification.markDelivered();
                 notificationRepository.save(notification);
             } catch (Exception e) {
                 log.warn("Failed to deliver notification {}: {}", notification.getId(), e.getMessage());
-                notificationRepository.save(notification.markAsFailed());
+                notificationRepository.save(notification.markFailed());
             }
         }
 

@@ -1,7 +1,7 @@
 package com.lautarorisso.notification_service.repository;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
@@ -14,7 +14,7 @@ public interface NotificationRepository extends MongoRepository<Notification, UU
 
     List<Notification> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
-    List<Notification> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, NotificationStatus status);
+    List<Notification> findByUserIdAndReadStatusOrderByCreatedAtDesc(UUID userId, NotificationReadStatus readStatus);
 
     /**
      * True when a notification for the given user was already created from the

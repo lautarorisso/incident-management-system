@@ -1,7 +1,8 @@
 package com.lautarorisso.notification_service.messaging;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
@@ -78,7 +79,7 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
         String eventId = UUID.randomUUID().toString();
 
         rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY_ASSIGNED,
-                buildEventPayload(eventId, incidentId, assigneeId.toString()));
+                buildEventPayload(eventId, incidentId, assigneeId.toString(), "jdoe@example.com"));
 
         // The listener writes the notification first and the dedup row LAST
         // (at-least-once ordering), so wait for both before asserting.
@@ -91,7 +92,9 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
         assertThat(notification.getType()).isEqualTo(NotificationType.INCIDENT_ASSIGNED);
         assertThat(notification.getUserId()).isEqualTo(assigneeId);
         assertThat(notification.getIncidentId()).isEqualTo(UUID.fromString(incidentId));
-        assertThat(notification.getStatus()).isIn(NotificationStatus.UNREAD, NotificationStatus.SENT);
+        assertThat(notification.getDeliveryStatus()).isIn(NotificationDeliveryStatus.PENDING, NotificationDeliveryStatus.SENT);
+        assertThat(notification.getReadStatus()).isEqualTo(NotificationReadStatus.UNREAD);
+        assertThat(notification.getRecipientEmail()).isEqualTo("jdoe@example.com");
         assertThat(notification.getEventId()).isEqualTo(eventId);
         assertThat(processedEventRepository.existsById(eventId)).isTrue();
     }
@@ -102,7 +105,7 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
         String incidentId = UUID.randomUUID().toString();
         String eventId = UUID.randomUUID().toString();
 
-        Map<String, Object> payload = buildEventPayload(eventId, incidentId, assigneeId.toString());
+        Map<String, Object> payload = buildEventPayload(eventId, incidentId, assigneeId.toString(), "jdoe@example.com");
         rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY_ASSIGNED, payload);
         rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY_ASSIGNED, payload);
 
@@ -127,14 +130,17 @@ class RabbitMqConsumptionIntegrationTest extends AbstractMongoTestBase {
      * {@code IncidentService.buildPayload(...)} (incidentId, title, status, priority,
      * assigneeId, teamId) → {@code OutboxPoller} stamps {@code eventId} →
      * {@code RabbitMqEventPublisher.publish} stamps {@code eventType} + {@code timestamp}.
+     * The {@code assigneeEmail} key mirrors fix 1: the incident-service outbox now
+     * carries the real recipient email in the payload.
      */
-    private Map<String, Object> buildEventPayload(String eventId, String incidentId, String assigneeId) {
+    private Map<String, Object> buildEventPayload(String eventId, String incidentId, String assigneeId, String assigneeEmail) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("incidentId", incidentId);
         payload.put("title", "Outbox event payload");
         payload.put("status", "OPEN");
         payload.put("priority", "HIGH");
         payload.put("assigneeId", assigneeId);
+        payload.put("assigneeEmail", assigneeEmail);
         payload.put("teamId", UUID.randomUUID().toString());
         payload.put("eventId", eventId);
         payload.put("eventType", "INCIDENT_ASSIGNED");

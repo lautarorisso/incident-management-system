@@ -1,7 +1,7 @@
 package com.lautarorisso.notification_service;
 
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
 import com.lautarorisso.notification_service.messaging.IncidentEventListener;
 import com.lautarorisso.notification_service.repository.NotificationRepository;
 import com.lautarorisso.notification_service.repository.ProcessedEventRepository;
@@ -71,7 +71,7 @@ class NotificationServiceIntegrationTest extends AbstractMongoTestBase {
 
         List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(assigneeId);
         assertEquals(1, notifications.size());
-        assertEquals(NotificationStatus.SENT, notifications.getFirst().getStatus());
+        assertEquals(NotificationDeliveryStatus.SENT, notifications.getFirst().getDeliveryStatus());
         assertTrue(processedEventRepository.existsById(eventId));
     }
 

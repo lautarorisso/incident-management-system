@@ -28,8 +28,11 @@ public record NotificationResponse(
         @Schema(description = "Notification message body", example = "Incident #123 has been assigned to you")
         String message,
 
+        @Schema(description = "Delivery status", example = "PENDING")
+        String deliveryStatus,
+
         @Schema(description = "Read status", example = "UNREAD")
-        String status,
+        String readStatus,
 
         @Schema(description = "Creation timestamp", example = "2026-07-29T12:00:00Z")
         Instant createdAt

@@ -1,17 +1,17 @@
 package com.lautarorisso.notification_service.controller;
 
-import com.lautarorisso.notification_service.dto.NotificationListItem;
-import com.lautarorisso.notification_service.dto.NotificationResponse;
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
-import com.lautarorisso.notification_service.repository.NotificationRepository;
+import com.lautarorisso.notification_service.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +19,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,23 +36,26 @@ class NotificationControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private NotificationRepository notificationRepository;
+    private NotificationService notificationService;
 
-    @Test
-    void getNotificationsByUserIdReturnsList() throws Exception {
-        UUID userId = UUID.randomUUID();
-        Notification notification = Notification.builder()
+    private Notification sampleNotification(UUID userId) {
+        return Notification.builder()
                 .id(UUID.randomUUID())
                 .type(NotificationType.INCIDENT_ASSIGNED)
                 .userId(userId)
                 .incidentId(UUID.randomUUID())
                 .title("Test notification")
                 .message("Test message")
-                .status(NotificationStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build();
+    }
 
-        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+    @Test
+    void getNotificationsByUserIdReturnsList() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Notification notification = sampleNotification(userId);
+
+        when(notificationService.getNotifications(any(), any(), eq(userId), isNull()))
                 .thenReturn(List.of(notification));
 
         mockMvc.perform(get("/api/notifications")
@@ -59,24 +64,17 @@ class NotificationControllerTest {
                         .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Test notification"))
-                .andExpect(jsonPath("$[0].status").value("UNREAD"));
+                .andExpect(jsonPath("$[0].deliveryStatus").value("PENDING"))
+                .andExpect(jsonPath("$[0].readStatus").value("UNREAD"));
     }
 
     @Test
-    void getNotificationsByUserIdAndStatusFilters() throws Exception {
+    void getNotificationsByUserIdAndReadStatusFilters() throws Exception {
         UUID userId = UUID.randomUUID();
-        Notification notification = Notification.builder()
-                .id(UUID.randomUUID())
-                .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(userId)
-                .incidentId(UUID.randomUUID())
-                .title("Unread notification")
-                .message("Test message")
-                .status(NotificationStatus.UNREAD)
-                .createdAt(Instant.now())
-                .build();
+        Notification notification = sampleNotification(userId);
 
-        when(notificationRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, NotificationStatus.UNREAD))
+        when(notificationService.getNotifications(
+                any(), any(), eq(userId), eq(NotificationReadStatus.UNREAD)))
                 .thenReturn(List.of(notification));
 
         mockMvc.perform(get("/api/notifications")
@@ -85,8 +83,40 @@ class NotificationControllerTest {
                         .accept(MediaType.APPLICATION_JSON)
                         .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").value("Unread notification"))
-                .andExpect(jsonPath("$[0].status").value("UNREAD"));
+                .andExpect(jsonPath("$[0].title").value("Test notification"))
+                .andExpect(jsonPath("$[0].readStatus").value("UNREAD"));
+    }
+
+    @Test
+    void getNotificationsReadStatusFilterIsCaseInsensitive() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Notification notification = sampleNotification(userId);
+
+        when(notificationService.getNotifications(
+                any(), any(), eq(userId), eq(NotificationReadStatus.READ)))
+                .thenReturn(List.of(notification));
+
+        mockMvc.perform(get("/api/notifications")
+                        .param("userId", userId.toString())
+                        .param("status", "read")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].readStatus").value("UNREAD"));
+    }
+
+    @Test
+    void getNotificationsWithInvalidStatusReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/notifications")
+                        .param("userId", userId.toString())
+                        .param("status", "BOGUS")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+                .andExpect(status().isBadRequest());
+
+        verify(notificationService, never()).getNotifications(any(), any(), any(), any());
     }
 
     @Test
@@ -100,11 +130,10 @@ class NotificationControllerTest {
                 .incidentId(UUID.randomUUID())
                 .title("Test notification")
                 .message("Test message")
-                .status(NotificationStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build();
 
-        when(notificationRepository.findById(notificationId))
+        when(notificationService.getById(any(), any(), eq(notificationId)))
                 .thenReturn(Optional.of(notification));
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
@@ -112,25 +141,17 @@ class NotificationControllerTest {
                         .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(notificationId.toString()))
-                .andExpect(jsonPath("$.title").value("Test notification"));
+                .andExpect(jsonPath("$.title").value("Test notification"))
+                .andExpect(jsonPath("$.deliveryStatus").value("PENDING"))
+                .andExpect(jsonPath("$.readStatus").value("UNREAD"));
     }
 
     @Test
     void getNotificationByIdReturns403WhenNotOwner() throws Exception {
         UUID notificationId = UUID.randomUUID();
-        Notification notification = Notification.builder()
-                .id(notificationId)
-                .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(UUID.randomUUID())
-                .incidentId(UUID.randomUUID())
-                .title("Test notification")
-                .message("Test message")
-                .status(NotificationStatus.UNREAD)
-                .createdAt(Instant.now())
-                .build();
 
-        when(notificationRepository.findById(notificationId))
-                .thenReturn(Optional.of(notification));
+        when(notificationService.getById(any(), any(), eq(notificationId)))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
@@ -140,7 +161,7 @@ class NotificationControllerTest {
 
     @Test
     void getNotificationByIdReturns404WhenNotFound() throws Exception {
-        when(notificationRepository.findById(any())).thenReturn(Optional.empty());
+        when(notificationService.getById(any(), any(), any())).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/notifications/{id}", UUID.randomUUID())
                         .accept(MediaType.APPLICATION_JSON)
@@ -152,57 +173,37 @@ class NotificationControllerTest {
     void markAsReadReturnsUpdatedNotification() throws Exception {
         UUID notificationId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Notification notification = Notification.builder()
-                .id(notificationId)
-                .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(userId)
-                .incidentId(UUID.randomUUID())
-                .title("Test notification")
-                .message("Test message")
-                .status(NotificationStatus.UNREAD)
-                .createdAt(Instant.now())
-                .build();
+        Notification notification = sampleNotification(userId);
+        Notification updated = notification.withReadStatus(NotificationReadStatus.READ);
 
-        when(notificationRepository.findById(notificationId))
-                .thenReturn(Optional.of(notification));
-        when(notificationRepository.save(any()))
-                .thenAnswer(inv -> inv.getArgument(0));
+        when(notificationService.markAsRead(any(), any(), eq(notificationId)))
+                .thenReturn(Optional.of(updated));
 
         mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
                         .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("READ"));
+                .andExpect(jsonPath("$.readStatus").value("READ"))
+                // Delivery status is preserved by markAsRead.
+                .andExpect(jsonPath("$.deliveryStatus").value("PENDING"));
     }
 
     @Test
     void markAsReadReturns403WhenNotOwner() throws Exception {
         UUID notificationId = UUID.randomUUID();
-        Notification notification = Notification.builder()
-                .id(notificationId)
-                .type(NotificationType.INCIDENT_ASSIGNED)
-                .userId(UUID.randomUUID())
-                .incidentId(UUID.randomUUID())
-                .title("Test notification")
-                .message("Test message")
-                .status(NotificationStatus.UNREAD)
-                .createdAt(Instant.now())
-                .build();
 
-        when(notificationRepository.findById(notificationId))
-                .thenReturn(Optional.of(notification));
+        when(notificationService.markAsRead(any(), any(), eq(notificationId)))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
 
         mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
                         .accept(MediaType.APPLICATION_JSON)
                         .with(jwt()))
                 .andExpect(status().isForbidden());
-
-        verify(notificationRepository, never()).save(any());
     }
 
     @Test
     void markAsReadReturns404WhenNotificationNotFound() throws Exception {
-        when(notificationRepository.findById(any())).thenReturn(Optional.empty());
+        when(notificationService.markAsRead(any(), any(), any())).thenReturn(Optional.empty());
 
         mockMvc.perform(patch("/api/notifications/{id}/read", UUID.randomUUID())
                         .accept(MediaType.APPLICATION_JSON)
@@ -213,7 +214,7 @@ class NotificationControllerTest {
     @Test
     void shouldReturnEmptyListWhenNoNotifications() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+        when(notificationService.getNotifications(any(), any(), eq(userId), isNull()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/notifications")
@@ -235,11 +236,10 @@ class NotificationControllerTest {
                 .incidentId(UUID.randomUUID())
                 .title("Test")
                 .message("Sensitive message content")
-                .status(NotificationStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build();
 
-        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+        when(notificationService.getNotifications(any(), any(), eq(userId), isNull()))
                 .thenReturn(List.of(notification));
 
         mockMvc.perform(get("/api/notifications")
@@ -264,11 +264,10 @@ class NotificationControllerTest {
                 .incidentId(UUID.randomUUID())
                 .title("Test")
                 .message("Full message content")
-                .status(NotificationStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build();
 
-        when(notificationRepository.findById(notificationId))
+        when(notificationService.getById(any(), any(), eq(notificationId)))
                 .thenReturn(Optional.of(notification));
 
         mockMvc.perform(get("/api/notifications/{id}", notificationId)

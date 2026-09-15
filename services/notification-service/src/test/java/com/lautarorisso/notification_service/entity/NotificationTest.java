@@ -4,7 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,15 +21,37 @@ class NotificationTest {
         assertNotNull(NotificationType.valueOf("INCIDENT_STATUS_CHANGED"));
     }
 
-    // --- NotificationStatus Tests ---
+    @Test
+    void fromEventTypeMapsKnownEventTypes() {
+        assertEquals(NotificationType.INCIDENT_ASSIGNED,
+                NotificationType.fromEventType("INCIDENT_ASSIGNED"));
+        assertEquals(NotificationType.INCIDENT_STATUS_CHANGED,
+                NotificationType.fromEventType("INCIDENT_STATUS_CHANGED"));
+    }
 
     @Test
-    void notificationStatusHasExpectedValues() {
-        assertEquals(4, NotificationStatus.values().length);
-        assertNotNull(NotificationStatus.valueOf("UNREAD"));
-        assertNotNull(NotificationStatus.valueOf("SENT"));
-        assertNotNull(NotificationStatus.valueOf("FAILED"));
-        assertNotNull(NotificationStatus.valueOf("READ"));
+    void fromEventTypeReturnsNullForUnknownOrNull() {
+        assertNull(NotificationType.fromEventType("UNKNOWN_EVENT"));
+        assertNull(NotificationType.fromEventType(null));
+    }
+
+    // --- NotificationDeliveryStatus Tests ---
+
+    @Test
+    void notificationDeliveryStatusHasExpectedValues() {
+        assertEquals(3, NotificationDeliveryStatus.values().length);
+        assertNotNull(NotificationDeliveryStatus.valueOf("PENDING"));
+        assertNotNull(NotificationDeliveryStatus.valueOf("SENT"));
+        assertNotNull(NotificationDeliveryStatus.valueOf("FAILED"));
+    }
+
+    // --- NotificationReadStatus Tests ---
+
+    @Test
+    void notificationReadStatusHasExpectedValues() {
+        assertEquals(2, NotificationReadStatus.values().length);
+        assertNotNull(NotificationReadStatus.valueOf("UNREAD"));
+        assertNotNull(NotificationReadStatus.valueOf("READ"));
     }
 
     // --- Notification Model Tests ---
@@ -47,7 +70,9 @@ class NotificationTest {
                 .incidentId(incidentId)
                 .title("You have been assigned")
                 .message("Incident #123 has been assigned to you")
-                .status(NotificationStatus.UNREAD)
+                .recipientEmail("jdoe@example.com")
+                .deliveryStatus(NotificationDeliveryStatus.SENT)
+                .readStatus(NotificationReadStatus.READ)
                 .createdAt(now)
                 .build();
 
@@ -57,12 +82,14 @@ class NotificationTest {
         assertEquals(incidentId, notification.getIncidentId());
         assertEquals("You have been assigned", notification.getTitle());
         assertEquals("Incident #123 has been assigned to you", notification.getMessage());
-        assertEquals(NotificationStatus.UNREAD, notification.getStatus());
+        assertEquals("jdoe@example.com", notification.getRecipientEmail());
+        assertEquals(NotificationDeliveryStatus.SENT, notification.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.READ, notification.getReadStatus());
         assertEquals(now, notification.getCreatedAt());
     }
 
     @Test
-    void notificationDefaultsToUnread() {
+    void notificationDefaultsToPendingAndUnread() {
         Notification notification = Notification.builder()
                 .id(UUID.randomUUID())
                 .type(NotificationType.INCIDENT_ASSIGNED)
@@ -72,7 +99,8 @@ class NotificationTest {
                 .message("Test message")
                 .build();
 
-        assertEquals(NotificationStatus.UNREAD, notification.getStatus());
+        assertEquals(NotificationDeliveryStatus.PENDING, notification.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.UNREAD, notification.getReadStatus());
     }
 
     @Test
@@ -84,13 +112,37 @@ class NotificationTest {
                 .incidentId(UUID.randomUUID())
                 .title("Status changed")
                 .message("Incident is now IN_PROGRESS")
-                .status(NotificationStatus.UNREAD)
+                .deliveryStatus(NotificationDeliveryStatus.SENT)
                 .build();
 
-        Notification read = notification.withStatus(NotificationStatus.READ);
+        Notification read = notification.withReadStatus(NotificationReadStatus.READ);
 
-        assertEquals(NotificationStatus.READ, read.getStatus());
-        assertEquals(NotificationStatus.UNREAD, notification.getStatus()); // original unchanged
+        assertEquals(NotificationReadStatus.READ, read.getReadStatus());
+        // Delivery status is preserved by the copy-through.
+        assertEquals(NotificationDeliveryStatus.SENT, read.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.UNREAD, notification.getReadStatus()); // original unchanged
+    }
+
+    @Test
+    void markDeliveredAndMarkFailedPreserveReadStatus() {
+        Notification notification = Notification.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(UUID.randomUUID())
+                .readStatus(NotificationReadStatus.READ)
+                .build();
+
+        Notification delivered = notification.markDelivered();
+        assertEquals(NotificationDeliveryStatus.SENT, delivered.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.READ, delivered.getReadStatus());
+
+        Notification failed = notification.markFailed();
+        assertEquals(NotificationDeliveryStatus.FAILED, failed.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.READ, failed.getReadStatus());
+
+        // Original instance unchanged.
+        assertEquals(NotificationDeliveryStatus.PENDING, notification.getDeliveryStatus());
+        assertEquals(NotificationReadStatus.READ, notification.getReadStatus());
     }
 
     // --- ProcessedEvent Tests ---

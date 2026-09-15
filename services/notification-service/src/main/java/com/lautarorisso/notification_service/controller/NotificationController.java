@@ -3,8 +3,8 @@ package com.lautarorisso.notification_service.controller;
 import com.lautarorisso.notification_service.dto.NotificationListItem;
 import com.lautarorisso.notification_service.dto.NotificationResponse;
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
-import com.lautarorisso.notification_service.repository.NotificationRepository;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
+import com.lautarorisso.notification_service.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,12 +26,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * REST controller for notification read and update operations.
+ * <p>
+ * Thin HTTP mapping layer: authorization (owner-check), filtering, and
+ * persistence live in {@link NotificationService}.
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -40,38 +41,34 @@ import java.util.stream.Collectors;
 @Tag(name = "Notifications", description = "Notification management endpoints")
 public class NotificationController {
 
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
 
     @GetMapping
     @Operation(summary = "Get notifications for a user",
-            description = "Returns notifications for the specified user, optionally filtered by status. "
+            description = "Returns notifications for the specified user, optionally filtered by read status. "
                     + "Access is restricted to the owner (JWT sub == userId) or an admin.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of notifications",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = NotificationListItem.class)))),
-            @ApiResponse(responseCode = "400", description = "Missing required userId parameter"),
+            @ApiResponse(responseCode = "400", description = "Missing required userId parameter or invalid status value"),
             @ApiResponse(responseCode = "401", description = "Missing or invalid bearer token"),
             @ApiResponse(responseCode = "403", description = "Not the notification owner and not an admin")
     })
     public ResponseEntity<List<NotificationListItem>> getNotifications(
             @Parameter(description = "User ID to get notifications for", required = true)
             @RequestParam UUID userId,
-            @Parameter(description = "Filter by status (UNREAD, READ)")
+            @Parameter(description = "Filter by read status (UNREAD, READ)")
             @RequestParam(required = false) String status,
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
 
-        if (!isOwnerOrAdmin(jwt, authentication, userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        NotificationReadStatus readStatus = null;
+        if (status != null) {
+            readStatus = NotificationReadStatus.valueOf(status.toUpperCase());
         }
 
-        List<Notification> notifications;
-        if (status != null) {
-            notifications = notificationRepository.findByUserIdAndStatusOrderByCreatedAtDesc(
-                    userId, NotificationStatus.valueOf(status.toUpperCase()));
-        } else {
-            notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        }
+        List<Notification> notifications = notificationService.getNotifications(
+                jwt, authentication, userId, readStatus);
 
         return ResponseEntity.ok(toListItemList(notifications));
     }
@@ -90,22 +87,14 @@ public class NotificationController {
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
 
-        Optional<Notification> found = notificationRepository.findById(id);
-        if (found.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        Notification notification = found.get();
-
-        if (!isOwnerOrAdmin(jwt, authentication, notification.getUserId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        return ResponseEntity.ok(toResponse(notification));
+        return notificationService.getById(jwt, authentication, id)
+                .map(notification -> ResponseEntity.ok(toResponse(notification)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PatchMapping("/{id}/read")
     @Operation(summary = "Mark a notification as read",
-            description = "Sets the notification status to READ and returns the updated notification")
+            description = "Sets the notification read status to READ (delivery status preserved) and returns the updated notification")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notification marked as read",
                     content = @Content(schema = @Schema(implementation = NotificationResponse.class))),
@@ -118,36 +107,12 @@ public class NotificationController {
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
 
-        Optional<Notification> found = notificationRepository.findById(id);
-        if (found.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        Notification notification = found.get();
-
-        if (!isOwnerOrAdmin(jwt, authentication, notification.getUserId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        Notification updated = notification.withStatus(NotificationStatus.READ);
-        notificationRepository.save(updated);
-
-        return ResponseEntity.ok(toResponse(updated));
+        return notificationService.markAsRead(jwt, authentication, id)
+                .map(notification -> ResponseEntity.ok(toResponse(notification)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // --- Manual mapping helpers (no MapStruct) ---
-
-    /**
-     * Owner-check for the notification list endpoint: a caller may list the
-     * notifications of {@code userId} only when the JWT {@code sub} claim
-     * equals it, or when the caller holds {@code ROLE_ADMIN}. Violations
-     * return 403 (never 404) so notification existence is not leaked.
-     */
-    private boolean isOwnerOrAdmin(Jwt jwt, Authentication authentication, UUID userId) {
-        String sub = jwt != null ? jwt.getSubject() : null;
-        boolean admin = authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
-        return userId.toString().equals(sub) || admin;
-    }
 
     private NotificationResponse toResponse(Notification notification) {
         return new NotificationResponse(
@@ -157,7 +122,8 @@ public class NotificationController {
                 notification.getIncidentId(),
                 notification.getTitle(),
                 notification.getMessage(),
-                notification.getStatus() != null ? notification.getStatus().name() : null,
+                notification.getDeliveryStatus() != null ? notification.getDeliveryStatus().name() : null,
+                notification.getReadStatus() != null ? notification.getReadStatus().name() : null,
                 notification.getCreatedAt());
     }
 
@@ -166,7 +132,8 @@ public class NotificationController {
                 notification.getId(),
                 notification.getType() != null ? notification.getType().name() : null,
                 notification.getTitle(),
-                notification.getStatus() != null ? notification.getStatus().name() : null,
+                notification.getDeliveryStatus() != null ? notification.getDeliveryStatus().name() : null,
+                notification.getReadStatus() != null ? notification.getReadStatus().name() : null,
                 notification.getCreatedAt());
     }
 

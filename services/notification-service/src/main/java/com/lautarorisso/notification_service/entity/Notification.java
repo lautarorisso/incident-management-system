@@ -11,7 +11,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
+import com.lautarorisso.notification_service.enums.NotificationDeliveryStatus;
+import com.lautarorisso.notification_service.enums.NotificationReadStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
 
 /**
@@ -19,6 +20,11 @@ import com.lautarorisso.notification_service.enums.NotificationType;
  * <p>
  * In the layered architecture this document serves as both the persistence
  * model and the domain model — no separate NotificationId value object.
+ * <p>
+ * Delivery and read state are modeled as two independent enum fields
+ * ({@link NotificationDeliveryStatus}, {@link NotificationReadStatus}).
+ * Legacy documents carrying only {@code status} are covered by the
+ * {@link Builder @Builder} defaults and are not migrated.
  */
 @Document(collection = "notifications")
 @Getter
@@ -50,15 +56,29 @@ public class Notification {
      */
     private String eventId;
 
+    /**
+     * Recipient email denormalized from the incident event payload
+     * ({@code assigneeEmail}). Nullable: legacy events and status events
+     * without an assignee carry no email; {@code EmailNotificationSender}
+     * falls back to the placeholder address in that case. Kept out of every
+     * response DTO — internal delivery data, not API surface.
+     */
+    private String recipientEmail;
+
     @Builder.Default
-    private NotificationStatus status = NotificationStatus.UNREAD;
+    private NotificationDeliveryStatus deliveryStatus = NotificationDeliveryStatus.PENDING;
+
+    @Builder.Default
+    private NotificationReadStatus readStatus = NotificationReadStatus.UNREAD;
 
     private Instant createdAt;
 
     /**
-     * Returns a new Notification with the given status, leaving this instance unchanged.
+     * Returns a copy of this Notification with the given delivery/read status,
+     * leaving this instance unchanged (immutability style).
      */
-    public Notification withStatus(NotificationStatus newStatus) {
+    private Notification copyWith(NotificationDeliveryStatus newDeliveryStatus,
+                                  NotificationReadStatus newReadStatus) {
         return Notification.builder()
                 .id(this.id)
                 .type(this.type)
@@ -67,22 +87,34 @@ public class Notification {
                 .title(this.title)
                 .message(this.message)
                 .eventId(this.eventId)
-                .status(newStatus)
+                .recipientEmail(this.recipientEmail)
+                .deliveryStatus(newDeliveryStatus)
+                .readStatus(newReadStatus)
                 .createdAt(this.createdAt)
                 .build();
     }
 
     /**
-     * Returns a new Notification marked as SENT.
+     * Returns a new Notification marked as delivered (SENT), leaving this
+     * instance unchanged. The read status is preserved.
      */
-    public Notification markAsSent() {
-        return withStatus(NotificationStatus.SENT);
+    public Notification markDelivered() {
+        return copyWith(NotificationDeliveryStatus.SENT, this.readStatus);
     }
 
     /**
-     * Returns a new Notification marked as FAILED.
+     * Returns a new Notification marked as FAILED, leaving this instance
+     * unchanged. The read status is preserved.
      */
-    public Notification markAsFailed() {
-        return withStatus(NotificationStatus.FAILED);
+    public Notification markFailed() {
+        return copyWith(NotificationDeliveryStatus.FAILED, this.readStatus);
+    }
+
+    /**
+     * Returns a new Notification with the given read status, leaving this
+     * instance unchanged. The delivery status is preserved.
+     */
+    public Notification withReadStatus(NotificationReadStatus newReadStatus) {
+        return copyWith(this.deliveryStatus, newReadStatus);
     }
 }

@@ -2,8 +2,8 @@ package com.lautarorisso.notification_service.notifier;
 
 import com.ims.shared.exception.NotificationDeliveryException;
 import com.lautarorisso.notification_service.entity.Notification;
-import com.lautarorisso.notification_service.enums.NotificationStatus;
 import com.lautarorisso.notification_service.enums.NotificationType;
+import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -37,7 +37,6 @@ class EmailNotificationSenderTest {
                 .incidentId(UUID.randomUUID())
                 .title("Test Title")
                 .message("Test message body")
-                .status(NotificationStatus.UNREAD)
                 .createdAt(Instant.now())
                 .build();
     }
@@ -104,5 +103,47 @@ class EmailNotificationSenderTest {
 
         assertNotNull(ex.getCause());
         assertEquals("internal details", ex.getCause().getMessage());
+    }
+
+    @Test
+    void usesRealRecipientEmailWhenPresent() throws Exception {
+        EmailNotificationSender sender = new EmailNotificationSender(mailSender, "from@test.local", true);
+        MimeMessage mimeMessage = realMimeMessage();
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        Notification notification = Notification.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationType.INCIDENT_ASSIGNED)
+                .userId(UUID.randomUUID())
+                .title("Email test")
+                .message("Body")
+                .recipientEmail("assignee@example.com")
+                .createdAt(Instant.now())
+                .build();
+
+        sender.send(notification);
+
+        verify(mailSender).send(mimeMessage);
+        Address[] recipients = mimeMessage.getAllRecipients();
+        assertNotNull(recipients);
+        assertEquals(1, recipients.length);
+        assertEquals("assignee@example.com", recipients[0].toString());
+    }
+
+    @Test
+    void fallsBackToPlaceholderEmailWhenRecipientEmailMissing() throws Exception {
+        EmailNotificationSender sender = new EmailNotificationSender(mailSender, "from@test.local", true);
+        MimeMessage mimeMessage = realMimeMessage();
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        Notification notification = sampleNotification(); // no recipientEmail
+
+        sender.send(notification);
+
+        verify(mailSender).send(mimeMessage);
+        Address[] recipients = mimeMessage.getAllRecipients();
+        assertNotNull(recipients);
+        assertEquals(1, recipients.length);
+        assertEquals("user-" + notification.getUserId() + "@ims.local", recipients[0].toString());
     }
 }

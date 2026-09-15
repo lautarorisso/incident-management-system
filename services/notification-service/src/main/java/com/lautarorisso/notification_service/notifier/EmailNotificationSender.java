@@ -41,7 +41,7 @@ public class EmailNotificationSender {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress);
-            helper.setTo(resolveEmail(notification.getUserId()));
+            helper.setTo(resolveEmail(notification));
             helper.setSubject(notification.getTitle());
             helper.setText(buildHtmlBody(notification), true);
 
@@ -54,7 +54,23 @@ public class EmailNotificationSender {
         }
     }
 
-    private String resolveEmail(UUID userId) {
+    /**
+     * Resolves the email address for the notification. Prefers the
+     * denormalized {@code recipientEmail} carried by the event payload;
+     * falls back to the placeholder address for legacy or assignee-less
+     * events (which carry no email).
+     */
+    private String resolveEmail(Notification notification) {
+        String realEmail = notification.getRecipientEmail();
+        if (realEmail != null && !realEmail.isBlank()) {
+            return realEmail;
+        }
+        log.warn("No recipient email for notification {} (legacy/no-assignee event), using placeholder",
+                notification.getId());
+        return placeholderEmail(notification.getUserId());
+    }
+
+    private String placeholderEmail(UUID userId) {
         return "user-" + userId + "@ims.local";
     }
 
@@ -97,7 +113,7 @@ public class EmailNotificationSender {
             Created: {}
             ==========================================
             """,
-            resolveEmail(notification.getUserId()),
+            placeholderEmail(notification.getUserId()),
             notification.getType(),
             notification.getTitle(),
             notification.getMessage(),
