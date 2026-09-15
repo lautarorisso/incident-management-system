@@ -4,7 +4,7 @@
 
 Microservices-based incident management system built with Spring Boot 3.5, Spring Cloud 2025, and Java 21.
 
-> **Note**: This is a work-in-progress MVP for portfolio demonstration. It runs fully containerized with Keycloak authentication (realm, users and roles are provisioned automatically).
+> **Note**: A deliberately small but production-shaped microservices system — real patterns (transactional outbox, at-least-once delivery with dedup and dead-lettering, JWT resource servers with token relay) running against real infrastructure. Fully containerized: one `docker compose up` provisions everything, including the Keycloak realm, users and roles. Credentials are development defaults — this is a portfolio-grade reference, not a hardened production deployment.
 
 ## Architecture
 
@@ -41,6 +41,34 @@ Microservices-based incident management system built with Spring Boot 3.5, Sprin
 ```
 
 All domain services use a **layered architecture** (controller → service → repository), where the JPA entity serves as both the persistence and domain model. Cross-service DTOs and shared infrastructure beans live in the `services/shared` module.
+
+## Why These Choices
+
+Every microservice system is a chain of tradeoffs. These are the ones that shape this project — the problem each decision solves, and the price it pays.
+
+### Each service owns its data
+
+Two services sharing one database are only half a microservice: the coupling just moves into the schema. Here every service has its own database and no service reads another's tables. Incidents and users live in PostgreSQL because they are relational — state machines, constraints, joins. Notifications live in MongoDB because they are written-once, read-by-owner documents with no joins to do.
+
+### The transactional outbox
+
+Sending an event from inside the same transaction that changes the database risks losing the event if the transaction rolls back. Sending it after the commit risks the opposite: the event goes out but the change never happened. The outbox solves both — the incident change and an `OutboxEvent` row commit atomically, and a poller forwards the row to RabbitMQ a moment later. The price is a few seconds of latency; the reward is no lost events and no two-phase commit.
+
+### At-least-once delivery, dedup, and a dead-letter queue
+
+RabbitMQ does not deliver exactly once — that guarantee does not exist in the broker. The realistic contract is at-least-once: a message may arrive more than once, so consumers must be idempotent. The notification service records every processed event and skips duplicates. If a message keeps failing, it is retried a bounded number of times and then parked in a dead-letter queue, where a human can inspect and replay it — never silently dropped.
+
+### One public door: the gateway
+
+Nothing is exposed except the API Gateway. It validates every JWT, rate-limits per client IP, applies a circuit breaker per route, and logs every request with a correlation id. The services register only in Eureka and are reachable only inside the Docker network.
+
+### Identity travels as a token, not a header
+
+The cheap design lets the gateway authenticate and then forward the user id in a header like `X-User-Id`. The problem: every internal service trusts that header, so any service that can reach another can impersonate anyone. Instead, every service is itself a JWT resource server — it validates the token locally, and when it must call a sibling it relays the caller's original `Authorization` header through Feign. Slightly more setup per service; in return, identity is verified at every hop.
+
+### Configuration lives in its own repository
+
+The per-service YAML files — datasources, broker hosts, issuer URIs — are versioned in a separate GitHub repository and served by the Config Server. Environment-specific values stay out of the application code, and config changes get their own review history instead of hiding inside feature commits.
 
 ## Services
 
