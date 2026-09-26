@@ -38,7 +38,8 @@
 # used right after; tear it down manually with `docker compose down`.
 #
 # Usage:
-#   ./scripts/e2e-test.sh              # default (local ports)
+#   ./scripts/e2e-test.sh              # readiness gates + E2E suite
+#   ./scripts/e2e-test.sh --ready-only # readiness gates only
 #
 # Optional env vars (same surface as the E2E suite / smoke-test.sh):
 #   GATEWAY_URL, INCIDENT_URL, NOTIFICATION_URL, USER_URL, DISCOVERY_URL,
@@ -46,6 +47,16 @@
 # =============================================================================
 
 set -euo pipefail
+
+READY_ONLY=false
+if [ "${1:-}" = "--ready-only" ]; then
+    READY_ONLY=true
+    shift
+fi
+if [ "$#" -gt 0 ]; then
+    echo "Usage: $0 [--ready-only]" >&2
+    exit 2
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -289,7 +300,11 @@ main() {
 
     echo ""
     echo "═══════════════════════════════════════════════════════════════"
-    echo "  IMS E2E Test Suite"
+    if [ "$READY_ONLY" = true ]; then
+        echo "  IMS Demo Stack Startup"
+    else
+        echo "  IMS E2E Test Suite"
+    fi
     echo "  $(date '+%Y-%m-%d %H:%M:%S')"
     echo "═══════════════════════════════════════════════════════════════"
     echo ""
@@ -334,6 +349,16 @@ main() {
         exit 1
     fi
     echo ""
+
+    if [ "$READY_ONLY" = true ]; then
+        echo "═══════════════════════════════════════════════════════════════"
+        echo -e "  ${PASS} Demo stack is ready — $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  Scalar:  ${GATEWAY_URL}/scalar"
+        echo "  Mailpit: http://localhost:8025"
+        return
+    fi
 
     # ---- Phase 4: Run the E2E suite ------------------------------------------
     echo "── Phase 4: Running REST Assured E2E suite (e2e-tests module) ───────"

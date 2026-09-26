@@ -29,7 +29,15 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/actuator/**", "/scalar", "/scalar/**", "/v3/api-docs/**").permitAll()
+                        .pathMatchers(
+                                "/actuator/**",
+                                "/scalar",
+                                "/scalar/**",
+                                "/v3/api-docs/**",
+                                "/api/incidents/v3/api-docs/**",
+                                "/api/users/v3/api-docs/**",
+                                "/api/notifications/v3/api-docs/**")
+                        .permitAll()
                         // Incident creation is open to every authenticated role.
                         .pathMatchers(HttpMethod.POST, "/api/incidents").hasAnyRole("ADMIN", "AGENT", "USER")
                         // Workflow operations are for staff only.

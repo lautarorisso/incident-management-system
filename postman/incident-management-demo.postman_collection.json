@@ -1,0 +1,239 @@
+{
+  "info": {
+    "_postman_id": "b48d1a57-ecab-48af-9215-9d64fcdb4772",
+    "name": "Incident Management System - Recruiter Demo",
+    "description": "Runs the main API happy path through the API Gateway. The collection obtains a short-lived Keycloak token automatically before each request and stores runtime IDs as collection variables. The checked-in credentials are local demo defaults only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const expiresAt = Number(pm.collectionVariables.get('accessTokenExpiresAt') || 0);",
+          "if (!pm.collectionVariables.get('accessToken') || Date.now() >= expiresAt) {",
+          "  pm.sendRequest({",
+          "  url: `${pm.collectionVariables.get('keycloakUrl')}/realms/${pm.collectionVariables.get('realm')}/protocol/openid-connect/token`,",
+          "  method: 'POST',",
+          "  header: { 'Content-Type': 'application/x-www-form-urlencoded' },",
+          "  body: {",
+          "    mode: 'urlencoded',",
+          "    urlencoded: [",
+          "      { key: 'grant_type', value: 'password' },",
+          "      { key: 'client_id', value: pm.collectionVariables.get('clientId') },",
+          "      { key: 'username', value: pm.collectionVariables.get('username') },",
+          "      { key: 'password', value: pm.collectionVariables.get('password') }",
+          "    ]",
+          "  }",
+          "  }, (error, response) => {",
+          "    if (error) { throw error; }",
+          "    pm.expect(response.code, 'Keycloak token response').to.eql(200);",
+          "    const token = response.json();",
+          "    pm.expect(token.access_token, 'access token').to.be.a('string').and.not.empty;",
+          "    pm.collectionVariables.set('accessToken', token.access_token);",
+          "    pm.collectionVariables.set('accessTokenExpiresAt', Date.now() + ((token.expires_in - 15) * 1000));",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "gatewayUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "keycloakUrl", "value": "http://localhost:18080", "type": "string" },
+    { "key": "realm", "value": "ims", "type": "string" },
+    { "key": "clientId", "value": "ims-frontend", "type": "string" },
+    { "key": "username", "value": "lautaro", "type": "string" },
+    { "key": "password", "value": "admin1234", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "accessTokenExpiresAt", "value": "0", "type": "string" },
+    { "key": "assigneeId", "value": "", "type": "string" },
+    { "key": "incidentId", "value": "", "type": "string" },
+    { "key": "notificationPollAttempt", "value": "0", "type": "string" },
+    { "key": "notificationPollMaxAttempts", "value": "10", "type": "string" },
+    { "key": "notificationPollDelayMs", "value": "1500", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. List Users",
+      "request": {
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/users",
+        "description": "Lists the seeded directory and saves the first active user for assignment."
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Users are returned', () => {",
+            "  pm.response.to.have.status(200);",
+            "  const users = pm.response.json();",
+            "  pm.expect(users).to.be.an('array').that.is.not.empty;",
+            "  pm.expect(users[0].id).to.match(/^[0-9a-f-]{36}$/i);",
+            "  pm.collectionVariables.set('assigneeId', users[0].id);",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "2. Create Incident",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Recruiter demo incident {{$timestamp}}\",\n  \"description\": \"Created from the version-controlled Postman collection\",\n  \"priority\": \"HIGH\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/incidents"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Incident is created in OPEN state', () => {",
+            "  pm.response.to.have.status(201);",
+            "  const incident = pm.response.json();",
+            "  pm.expect(incident.id).to.match(/^[0-9a-f-]{36}$/i);",
+            "  pm.expect(incident.status).to.eql('OPEN');",
+            "  pm.collectionVariables.set('incidentId', incident.id);",
+            "  pm.collectionVariables.set('notificationPollAttempt', '0');",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "3. Assign Incident",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"assigneeId\": \"{{assigneeId}}\"\n}" },
+        "url": "{{gatewayUrl}}/api/incidents/{{incidentId}}/assign"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Incident is assigned to the selected user', () => {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.json().assigneeId).to.eql(pm.collectionVariables.get('assigneeId'));",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "4. Transition Incident",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"newStatus\": \"IN_PROGRESS\"\n}" },
+        "url": "{{gatewayUrl}}/api/incidents/{{incidentId}}/transition"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Incident moves to IN_PROGRESS', () => {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.json().status).to.eql('IN_PROGRESS');",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "5. List Notifications",
+      "request": {
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/notifications?userId={{assigneeId}}",
+        "description": "Polls for a notification whose detail references the incident created by this run. In Collection Runner, this request retries at most 10 times with a 1.5-second delay and fails if the matching notification never appears."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const attempt = Number(pm.collectionVariables.get('notificationPollAttempt') || 0);",
+              "if (attempt > 0) {",
+              "  const delayMs = Number(pm.collectionVariables.get('notificationPollDelayMs'));",
+              "  setTimeout(() => {}, delayMs);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const notifications = pm.response.json();",
+              "pm.expect(notifications, 'notification list').to.be.an('array');",
+              "const incidentId = pm.collectionVariables.get('incidentId');",
+              "const attempt = Number(pm.collectionVariables.get('notificationPollAttempt') || 0);",
+              "const maxAttempts = Number(pm.collectionVariables.get('notificationPollMaxAttempts'));",
+              "const finishAttempt = (found) => {",
+              "  if (found) {",
+              "    pm.test('A notification for the created incident eventually appears', () => {",
+              "      pm.expect(found.incidentId).to.eql(incidentId);",
+              "    });",
+              "    pm.collectionVariables.unset('notificationPollAttempt');",
+              "    return;",
+              "  }",
+              "  if (attempt + 1 < maxAttempts) {",
+              "    pm.collectionVariables.set('notificationPollAttempt', String(attempt + 1));",
+              "    pm.execution.setNextRequest(pm.info.requestName);",
+              "    return;",
+              "  }",
+              "  pm.test(`Notification for incident ${incidentId} appears within ${maxAttempts} attempts`, () => {",
+              "    pm.expect.fail(`No notification referencing incident ${incidentId} appeared after ${maxAttempts} attempts`);",
+              "  });",
+              "  pm.collectionVariables.unset('notificationPollAttempt');",
+              "  pm.execution.setNextRequest(null);",
+              "};",
+              "const candidates = notifications.slice(0, 10);",
+              "if (candidates.length === 0) {",
+              "  finishAttempt(null);",
+              "} else {",
+              "  let remaining = candidates.length;",
+              "  let match = null;",
+              "  candidates.forEach((notification) => {",
+              "    pm.sendRequest({",
+              "      url: `${pm.collectionVariables.get('gatewayUrl')}/api/notifications/${notification.id}` ,",
+              "      method: 'GET',",
+              "      header: { Authorization: `Bearer ${pm.collectionVariables.get('accessToken')}` }",
+              "    }, (error, response) => {",
+              "      if (!error && response.code === 200) {",
+              "        const detail = response.json();",
+              "        if (detail.incidentId === incidentId) { match = detail; }",
+              "      }",
+              "      remaining -= 1;",
+              "      if (remaining === 0) { finishAttempt(match); }",
+              "    });",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

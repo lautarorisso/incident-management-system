@@ -125,6 +125,28 @@ class GatewayAuthorizationTest {
     }
 
     @Test
+    void aggregatedDownstreamApiDocsRemainPublic() {
+        List.of(
+                "/api/incidents/v3/api-docs",
+                "/api/users/v3/api-docs",
+                "/api/notifications/v3/api-docs")
+                .forEach(path -> client.get().uri(path)
+                        .exchange()
+                        .expectStatus().value(status -> assertThat(status)
+                                .as("anonymous access to %s", path)
+                                .isNotEqualTo(401)
+                                .isNotEqualTo(403)));
+    }
+
+    @Test
+    void businessApisStillRequireAuthentication() {
+        List.of("/api/incidents", "/api/users", "/api/notifications")
+                .forEach(path -> client.get().uri(path)
+                        .exchange()
+                        .expectStatus().isUnauthorized());
+    }
+
+    @Test
     void eurekaIsNoLongerPubliclyAccessible() {
         client.get().uri("/eureka/")
                 .exchange()

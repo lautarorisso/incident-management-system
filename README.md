@@ -81,38 +81,68 @@ The per-service YAML files — datasources, broker hosts, issuer URIs — are ve
 | notification-service | 8083 | Consumes incident events from RabbitMQ, persists and delivers notifications |
 | user-service | 8082 | Read-only user profiles and teams |
 
-## Infrastructure
-
-| Component | Port | UI |
-|-----------|------|----|
-| PostgreSQL | 5432 | — |
-| MongoDB | 27017 | — |
-| RabbitMQ | 5672 | http://localhost:15672 |
-
 ## Prerequisites
 
-- Docker & Docker Compose
+- Docker with Docker Compose v2
+- `git`, `curl`, `jq`, and an SSH client
+- GitHub SSH access configured and verified for your account. The Config Server is an SSH Git submodule (`git@github.com:lautarorisso/config-server.git`), so an HTTPS-only GitHub setup cannot complete the recursive clone.
 
 ## Quick Start
 
-`config-server` is a git submodule (see [Config Server](#config-server)), so clone it recursively:
+Clone recursively over SSH, then run the single recruiter-friendly startup command:
 
 ```bash
-git clone --recursive https://github.com/lautarorisso/incident-management-system
+git clone --recurse-submodules git@github.com:lautarorisso/incident-management-system.git
 cd incident-management-system
-docker compose up -d --build
+./start-demo.sh
 ```
 
-> Already cloned without `--recursive`? Run `git submodule update --init --recursive`.
+The script builds and starts all **11 containers** (**5 infrastructure + 6 application/platform services**), waits for service health, Keycloak, Eureka registration, and gateway routing, then exits successfully only when the API demo is ready. It reuses the same readiness gates as the E2E launcher and does not run the E2E suite.
 
-This builds and starts all 10 containers (4 infra + 6 services). Wait ~60 seconds for all services to register in Eureka, then:
+> Already cloned without submodules? After confirming GitHub SSH access, run `git submodule update --init --recursive`.
 
 | URL | What |
 |-----|------|
-| http://localhost:8080 | API Gateway |
+| http://localhost:8080/scalar | Aggregated Scalar API reference (primary demo) |
 | http://localhost:8761 | Eureka Dashboard |
-| http://localhost:8888 | Config Server Health |
+| http://localhost:8888/actuator/health | Config Server Health |
 | http://localhost:15672 | RabbitMQ Management UI (guest/guest) |
+| http://localhost:8025 | Mailpit email inbox |
+
+## Three-Step API Demo
+
+1. Open [Scalar at the API Gateway](http://localhost:8080/scalar). Its gateway, incident, user, and notification OpenAPI specifications are public; business API requests still require a bearer token.
+2. Obtain a demo token, select **Bearer authentication** in Scalar, paste the token, and call `GET /api/incidents` to inspect the preloaded incidents:
+   ```bash
+   curl -s http://localhost:18080/realms/ims/protocol/openid-connect/token -d grant_type=password -d client_id=ims-frontend -d username=lautaro -d password=admin1234 | jq -r .access_token
+   ```
+3. Import [`postman/incident-management-demo.postman_collection.json`](postman/incident-management-demo.postman_collection.json) into Postman and run the collection. It automatically obtains a token, then lists users, creates an incident, assigns it, transitions it to `IN_PROGRESS`, and lists notifications through the gateway. Notification delivery is asynchronous; rerun the final request after a few seconds if its first list is empty.
+
+### Local Demo Data and Credentials
+
+These credentials are intentionally visible, non-production defaults committed solely for the local demo. **Production systems must use external secret management, confidential clients or authorization code flow with PKCE, rotated credentials, and no seeded administrator password.**
+
+| System | Username | Password | Access |
+|--------|----------|----------|--------|
+| Keycloak realm `ims` | `lautaro` | `admin1234` | `ims-admin` (used by the Postman collection) |
+| Keycloak realm `ims` | `agente1` | `agente1234` | `ims-agent`; linked to the seeded user-service profile |
+| Keycloak realm `ims` | `usuario1` | `usuario1234` | `ims-user` |
+| Keycloak Admin Console | `admin` | `admin` | Local realm administration |
+| RabbitMQ Management | `guest` | `guest` | Local broker administration |
+
+Fresh database volumes contain **10 incidents** spanning `OPEN`, `IN_PROGRESS`, `RESOLVED`, and `CLOSED`, plus the active `agente1` user profile (`9f6a2d1e-0000-4000-8000-0000000000A1`). Keycloak imports all three accounts above. Database volumes persist between starts; use `docker compose down -v` only when you intentionally want to reset the demo data.
+
+The Postman collection keeps hosts, credentials, tokens, and generated IDs as collection variables, so no separate environment file or duplicated secret configuration is required. Select the collection and use **Run collection** in its numbered order.
+
+### Troubleshooting Stale Demo Databases
+
+If startup reports a Flyway validation error after migrations changed, an older local Docker volume may still contain incompatible migration history. Reset the local demo databases, then run the documented startup command again:
+
+```bash
+docker compose down -v
+```
+
+> **Data loss warning:** `-v` permanently deletes this stack's PostgreSQL, MongoDB, and RabbitMQ volumes. The next startup recreates and re-seeds the demo data; do not run this command if those local volumes contain data you need.
 
 ## Running Tests
 
@@ -380,7 +410,7 @@ and mutation behavior (no public setters):
 | `SPRING_RABBITMQ_PASSWORD` | `guest` | RabbitMQ password |
 | `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | `http://localhost:8761/eureka` | Eureka server URL |
 
-**Database migrations**: Flyway (`V1__init_schema` … `V6__seed_data`) — schema, indexes, helper SQL functions/procedures, CHECK constraints + `updated_at` trigger, and demo seed data.
+**Database migrations**: Flyway (`V1__init_schema` … `V7__outbox_poison_handling`) — schema, indexes, helper SQL functions/procedures, CHECK constraints, demo seed data, and bounded outbox poison-event handling.
 
 ---
 
@@ -464,8 +494,9 @@ and mutation behavior (no public setters):
 |----------|-------------|
 | http://localhost:8080 | API Gateway |
 | http://localhost:8761 | Eureka Dashboard |
-| http://localhost:8888 | Config Server Health |
+| http://localhost:8888/actuator/health | Config Server Health |
 | http://localhost:15672 | RabbitMQ Management UI |
+| http://localhost:8025 | Mailpit email inbox |
 | http://localhost:18080 | Keycloak Admin Console (realm `ims` → admin/admin) |
 | http://localhost:8081/scalar | Incident Service API Docs |
 | http://localhost:8083/scalar | Notification Service API Docs |
@@ -479,6 +510,7 @@ and mutation behavior (no public setters):
 | PostgreSQL | 16 | `postgres` | 5432 | — |
 | MongoDB | 7 | `mongo` | 27017 | — |
 | RabbitMQ | 3-management | `rabbitmq` | 5672, 15672 | http://localhost:15672 (guest/guest) |
+| Mailpit | latest | `mailpit` | 1025, 8025 | http://localhost:8025 |
 | Keycloak | 26 | `keycloak` | 18080 | http://localhost:18080 (admin/admin) |
 
 ## Environment Variables
@@ -510,6 +542,8 @@ incident-management-system/
 ├── .gitmodules                 # Config Server submodule pointer
 ├── pom.xml                     # Parent Maven POM (multi-module)
 ├── mvnw                        # Maven wrapper
+├── start-demo.sh               # Starts the stack and waits for demo readiness
+├── postman/                    # Version-controlled API demo collection
 ├── e2e-tests/                  # Black-box E2E suite (REST Assured, gated by skipE2E)
 ├── scripts/
 │   ├── e2e-test.sh             # E2E runner: stack up + health gates + suite
